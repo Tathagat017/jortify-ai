@@ -133,7 +133,7 @@ const PageHeader: React.FC = observer(() => {
       />
 
       {/* Cover Image */}
-      {selectedPage.cover_image ? (
+      {selectedPage.cover_url ? (
         <Box
           style={{
             width: "100%",
@@ -147,7 +147,7 @@ const PageHeader: React.FC = observer(() => {
           onClick={handleCoverImageAdd}
         >
           <Image
-            src={selectedPage.cover_image}
+            src={selectedPage.cover_url}
             alt="Cover"
             style={{ width: "100%", height: "100%", objectFit: "cover" }}
           />
@@ -235,7 +235,18 @@ const PageHeader: React.FC = observer(() => {
             e.currentTarget.style.backgroundColor = "#fafafa";
           }}
         >
-          {selectedPage.icon ? (
+          {selectedPage.icon_url ? (
+            <Image
+              src={selectedPage.icon_url}
+              alt="Page Icon"
+              style={{
+                width: "100%",
+                height: "100%",
+                objectFit: "cover",
+                borderRadius: "6px",
+              }}
+            />
+          ) : selectedPage.icon ? (
             <Text size="xl">{selectedPage.icon}</Text>
           ) : (
             <FontAwesomeIcon icon={faSmile} size="lg" color="#787774" />

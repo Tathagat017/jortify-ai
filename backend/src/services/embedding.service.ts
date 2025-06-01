@@ -138,18 +138,23 @@ export class EmbeddingService {
       // Generate new embedding
       const embedding = await this.generateEmbedding(text);
 
-      // Store or update embedding
+      // Store or update embedding using proper upsert with conflict resolution
       const { error: upsertError } = await supabase
         .from("page_embeddings")
-        .upsert({
-          page_id: pageId,
-          content_hash: contentHash,
-          embedding: JSON.stringify(embedding),
-          metadata: {
-            textLength: text.length,
-            lastGenerated: new Date().toISOString(),
+        .upsert(
+          {
+            page_id: pageId,
+            content_hash: contentHash,
+            embedding: JSON.stringify(embedding),
+            metadata: {
+              textLength: text.length,
+              lastGenerated: new Date().toISOString(),
+            },
           },
-        });
+          {
+            onConflict: "page_id", // Specify the conflict column explicitly
+          }
+        );
 
       if (upsertError) {
         console.log(`Upsert error details:`, {

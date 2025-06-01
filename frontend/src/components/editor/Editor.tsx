@@ -1,7 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box } from "@mantine/core";
 import { observer } from "mobx-react-lite";
-import React from "react";
 import { useStore } from "../../hooks/use-store";
 import BlockNoteEditorComponent from "./BlockNoteEditor";
 

@@ -176,6 +176,13 @@ export class SummaryService {
     }>
   > {
     try {
+      console.log("🔍 SummaryService.getEnhancedLinkSuggestions called with:", {
+        text,
+        workspaceId,
+        pageId,
+        contextWindow,
+      });
+
       // Get pages with summaries in the workspace
       const { data: pages, error } = await supabase
         .from("pages")
@@ -185,8 +192,24 @@ export class SummaryService {
         .not("summary", "is", null)
         .limit(20);
 
+      console.log("📄 Query result for pages with summaries:", {
+        error,
+        pagesCount: pages?.length || 0,
+        pages:
+          pages?.map((p) => ({
+            id: p.id,
+            title: p.title,
+            hasSummary: !!p.summary,
+          })) || [],
+      });
+
       if (error || !pages) {
-        console.error("Error fetching pages for link suggestions:", error);
+        console.error("❌ Error fetching pages for link suggestions:", error);
+        return [];
+      }
+
+      if (pages.length === 0) {
+        console.log("⚠️ No pages with summaries found in workspace");
         return [];
       }
 
@@ -197,12 +220,25 @@ export class SummaryService {
         contextWindow
       );
 
-      return suggestions
+      console.log("🤖 analyzeLinkRelevance returned:", {
+        suggestionsCount: suggestions.length,
+        suggestions,
+      });
+
+      const filteredSuggestions = suggestions
         .filter((suggestion) => suggestion.confidence > 0.6) // Only return high-confidence suggestions
         .sort((a, b) => b.relevanceScore - a.relevanceScore)
         .slice(0, 8); // Limit to top 8 suggestions
+
+      console.log("📊 Final enhanced suggestions after filtering:", {
+        originalCount: suggestions.length,
+        filteredCount: filteredSuggestions.length,
+        suggestions: filteredSuggestions,
+      });
+
+      return filteredSuggestions;
     } catch (error) {
-      console.error("Error getting enhanced link suggestions:", error);
+      console.error("❌ Error getting enhanced link suggestions:", error);
       return [];
     }
   }

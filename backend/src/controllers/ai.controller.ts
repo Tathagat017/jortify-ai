@@ -41,16 +41,14 @@ const completeTextSchema = Joi.object({
 });
 
 const chatSchema = Joi.object({
-  question: Joi.string().required().min(1),
+  question: Joi.string().required(),
   conversationId: Joi.string().uuid().optional(),
   workspaceId: Joi.string().uuid().required(),
-  userId: Joi.string().uuid().optional(),
 });
 
 const createConversationSchema = Joi.object({
   workspaceId: Joi.string().uuid().required(),
   title: Joi.string().optional().default("New Chat"),
-  userId: Joi.string().uuid().optional(),
 });
 
 export class AIController {
@@ -279,13 +277,15 @@ export class AIController {
       );
     }
 
-    const { workspaceId, title, userId } = value;
+    const { workspaceId, title } = value;
+    const userId = req.user!.id; // Get userId from authenticated user
 
     // Validate workspace access
     const { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
       .select("id, name")
       .eq("id", workspaceId)
+      .eq("user_id", userId) // Ensure user owns the workspace
       .single();
 
     if (workspaceError || !workspace) {
@@ -317,7 +317,20 @@ export class AIController {
       );
     }
 
-    const { question, conversationId, workspaceId, userId } = value;
+    const { question, conversationId, workspaceId } = value;
+    const userId = req.user!.id; // Get userId from authenticated user
+
+    // Validate workspace access
+    const { data: workspace, error: workspaceError } = await supabase
+      .from("workspaces")
+      .select("id")
+      .eq("id", workspaceId)
+      .eq("user_id", userId) // Ensure user owns the workspace
+      .single();
+
+    if (workspaceError || !workspace) {
+      throw new AppError(404, "Workspace not found");
+    }
 
     // If no conversation ID provided, create a new conversation
     let activeConversationId = conversationId;
@@ -333,6 +346,7 @@ export class AIController {
       .from("chat_conversations")
       .select("id, workspace_id")
       .eq("id", activeConversationId)
+      .eq("user_id", userId) // Ensure user owns the conversation
       .single();
 
     if (convError || !conversation) {
@@ -379,12 +393,14 @@ export class AIController {
   // Get conversation history
   static async getConversationHistory(req: Request, res: Response) {
     const { conversationId } = req.params;
+    const userId = req.user!.id; // Get userId from authenticated user
 
     // Validate conversation exists and user has access
     const { data: conversation, error: convError } = await supabase
       .from("chat_conversations")
       .select("id, title, workspace_id, created_at, updated_at")
       .eq("id", conversationId)
+      .eq("user_id", userId) // Ensure user owns the conversation
       .single();
 
     if (convError || !conversation) {
@@ -416,12 +432,14 @@ export class AIController {
     const { workspaceId } = req.params;
     const limit = parseInt(req.query.limit as string) || 20;
     const offset = parseInt(req.query.offset as string) || 0;
+    const userId = req.user!.id; // Get userId from authenticated user
 
     // Validate workspace access
     const { data: workspace, error: workspaceError } = await supabase
       .from("workspaces")
       .select("id")
       .eq("id", workspaceId)
+      .eq("user_id", userId) // Ensure user owns the workspace
       .single();
 
     if (workspaceError || !workspace) {
@@ -440,6 +458,7 @@ export class AIController {
       `
       )
       .eq("workspace_id", workspaceId)
+      .eq("user_id", userId) // Ensure user owns the conversations
       .order("updated_at", { ascending: false })
       .range(offset, offset + limit - 1);
 
@@ -469,7 +488,8 @@ export class AIController {
     const { count: totalCount, error: countError } = await supabase
       .from("chat_conversations")
       .select("*", { count: "exact", head: true })
-      .eq("workspace_id", workspaceId);
+      .eq("workspace_id", workspaceId)
+      .eq("user_id", userId); // Ensure user owns the conversations
 
     if (countError) {
       throw new AppError(500, "Failed to count conversations");

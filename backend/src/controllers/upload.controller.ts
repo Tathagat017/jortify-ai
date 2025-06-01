@@ -30,7 +30,7 @@ export class UploadController {
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
-      .from("uploads")
+      .from("page-icons")
       .upload(fileName, processedImage, {
         contentType: "image/jpeg",
         upsert: false,
@@ -43,7 +43,7 @@ export class UploadController {
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("uploads").getPublicUrl(fileName);
+    } = supabase.storage.from("page-icons").getPublicUrl(fileName);
 
     // Update page or workspace with new icon URL
     if (page_id) {
@@ -98,7 +98,7 @@ export class UploadController {
 
     // Upload to Supabase Storage
     const { data, error } = await supabase.storage
-      .from("uploads")
+      .from("page-covers")
       .upload(fileName, processedImage, {
         contentType: "image/jpeg",
         upsert: false,
@@ -111,7 +111,7 @@ export class UploadController {
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("uploads").getPublicUrl(fileName);
+    } = supabase.storage.from("page-covers").getPublicUrl(fileName);
 
     // Update page or workspace with new cover URL
     if (page_id) {
@@ -141,6 +141,48 @@ export class UploadController {
     });
   }
 
+  // Upload general image for content
+  static async uploadImage(req: Request, res: Response) {
+    if (!req.file) {
+      throw new AppError(400, "No file uploaded");
+    }
+
+    // Process image with reasonable size limits
+    const processedImage = await sharp(req.file.buffer)
+      .resize(1920, 1080, {
+        fit: "inside",
+        withoutEnlargement: true,
+      })
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    // Generate unique filename
+    const fileName = `images/${uuidv4()}.jpg`;
+
+    // Upload to Supabase Storage
+    const { data, error } = await supabase.storage
+      .from("user-uploads")
+      .upload(fileName, processedImage, {
+        contentType: "image/jpeg",
+        upsert: false,
+      });
+
+    if (error) {
+      throw new AppError(500, `Failed to upload image: ${error.message}`);
+    }
+
+    // Get public URL
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("user-uploads").getPublicUrl(fileName);
+
+    res.json({
+      url: publicUrl,
+      fileName: data.path,
+      message: "Image uploaded successfully",
+    });
+  }
+
   // Delete uploaded file
   static async deleteFile(req: Request, res: Response) {
     const { fileId } = req.params;
@@ -150,7 +192,22 @@ export class UploadController {
       throw new AppError(400, "Invalid file ID format");
     }
 
-    const { error } = await supabase.storage.from("uploads").remove([fileId]);
+    // Determine bucket based on file path
+    let bucketName: string;
+    if (fileId.startsWith("icons/")) {
+      bucketName = "page-icons";
+    } else if (fileId.startsWith("covers/")) {
+      bucketName = "page-covers";
+    } else if (fileId.startsWith("images/")) {
+      bucketName = "user-uploads";
+    } else {
+      throw new AppError(
+        400,
+        "Invalid file path - must start with icons/, covers/, or images/"
+      );
+    }
+
+    const { error } = await supabase.storage.from(bucketName).remove([fileId]);
 
     if (error) {
       throw new AppError(500, `Failed to delete file: ${error.message}`);
@@ -167,8 +224,23 @@ export class UploadController {
     const { fileId } = req.params;
     const { expiresIn = 3600 } = req.query; // Default 1 hour
 
+    // Determine bucket based on file path
+    let bucketName: string;
+    if (fileId.startsWith("icons/")) {
+      bucketName = "page-icons";
+    } else if (fileId.startsWith("covers/")) {
+      bucketName = "page-covers";
+    } else if (fileId.startsWith("images/")) {
+      bucketName = "user-uploads";
+    } else {
+      throw new AppError(
+        400,
+        "Invalid file path - must start with icons/, covers/, or images/"
+      );
+    }
+
     const { data, error } = await supabase.storage
-      .from("uploads")
+      .from(bucketName)
       .createSignedUrl(fileId, parseInt(expiresIn as string));
 
     if (error) {
@@ -189,8 +261,23 @@ export class UploadController {
   static async getFileInfo(req: Request, res: Response) {
     const { fileId } = req.params;
 
+    // Determine bucket based on file path
+    let bucketName: string;
+    if (fileId.startsWith("icons/")) {
+      bucketName = "page-icons";
+    } else if (fileId.startsWith("covers/")) {
+      bucketName = "page-covers";
+    } else if (fileId.startsWith("images/")) {
+      bucketName = "user-uploads";
+    } else {
+      throw new AppError(
+        400,
+        "Invalid file path - must start with icons/, covers/, or images/"
+      );
+    }
+
     const { data, error } = await supabase.storage
-      .from("uploads")
+      .from(bucketName)
       .list(fileId.split("/")[0], {
         search: fileId.split("/")[1],
       });
@@ -207,7 +294,7 @@ export class UploadController {
     // Get public URL
     const {
       data: { publicUrl },
-    } = supabase.storage.from("uploads").getPublicUrl(fileId);
+    } = supabase.storage.from(bucketName).getPublicUrl(fileId);
 
     res.json({
       name: fileInfo.name,

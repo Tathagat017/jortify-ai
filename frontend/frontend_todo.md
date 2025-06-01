@@ -1,6 +1,6 @@
 # 🚀 Frontend Development Todo
 
-## 📊 **Overall Progress**: 65% Complete
+## 📊 **Overall Progress**: 65% Complete → **Starting Phase 3 AI Integration**
 
 ---
 
@@ -92,46 +92,104 @@
 
 ---
 
-## 🤖 **PHASE 3: AI Integration** 🚨 **HIGHEST PRIORITY** (0%)
+## 🤖 **PHASE 3: AI Integration** 🚨 **ACTIVE PHASE** (0% → Starting Now)
 
-### **AI Menu in BlockNote Editor** 🚨 **CRITICAL**
+### **Backend Status**: ✅ **ALL AI ENDPOINTS IMPLEMENTED**
 
-- [ ] ⚠️ `/ai` slash command trigger in BlockNote editor
-- [ ] ⚠️ AI menu popup with options:
+- ✅ POST /ai/suggestions - Real-time AI content suggestions
+- ✅ POST /ai/link-suggestions - Enhanced link suggestions
+- ✅ POST /ai/generate-tags - Auto-generate semantic tags
+- ✅ POST /ai/summarize - Generate page summaries
+- ✅ POST /ai/complete - Auto-complete text
+- ✅ POST /ai/analyze - Writing quality analysis
+- ✅ POST /ai/conversations - Create chat conversation
+- ✅ POST /ai/chat - RAG-based Q&A chatbot
+- ✅ GET /ai/conversations/:id - Get conversation history
+
+### **🚨 CRITICAL IMPLEMENTATION ORDER**
+
+#### **1. RAG Chatbot** 🚨 **HIGHEST PRIORITY** (Week 1)
+
+- [ ] ⚠️ **ChatStore implementation** - Full MobX store with conversation management
+- [ ] ⚠️ **Chatbot icon in bottom-right corner** (FontAwesome robot icon)
+- [ ] ⚠️ **Chatbot modal/popover UI** - Modern chat interface
+- [ ] ⚠️ **Message history display** - Conversation threading
+- [ ] ⚠️ **Streaming message support** - Real-time AI responses
+- [ ] ⚠️ **Suggested prompts** - Quick start questions
+- [ ] ⚠️ **Citations and source references** - Link to source pages
+- [ ] ⚠️ **Conversation management** - Create/delete/rename conversations
+
+#### **2. Auto-Linking System** 🚨 **CRITICAL** (Week 1)
+
+- [ ] ⚠️ **AILinkStore implementation** - Real-time link suggestions
+- [ ] ⚠️ **Link suggestion popup** - Floating UI with confidence scores
+- [ ] ⚠️ **Debounced typing detection** - Performance optimization
+- [ ] ⚠️ **One-click link acceptance** - Seamless integration
+- [ ] ⚠️ **Integration with BlockNote editor** - Inline suggestions
+
+#### **3. AI Menu in BlockNote Editor** 🚨 **CRITICAL** (Week 2)
+
+- [ ] ⚠️ **`/ai` slash command implementation** - Custom BlockNote command
+- [ ] ⚠️ **AI menu popup with options**:
   - [ ] ⚠️ Text completion _[API: POST /ai/complete]_
   - [ ] ⚠️ Content suggestions _[API: POST /ai/suggestions]_
   - [ ] ⚠️ Writing analysis _[API: POST /ai/analyze]_
   - [ ] ⚠️ Summarize content _[API: POST /ai/summarize]_
-- [ ] ⚠️ AI suggestion acceptance/rejection UI
-- [ ] ⚠️ Loading states for AI operations
+- [ ] ⚠️ **AI suggestion acceptance/rejection UI** - Accept/reject buttons
+- [ ] ⚠️ **Loading states for AI operations** - Skeleton loaders
 
-### **Auto-Linking System** 🚨 **CRITICAL**
+#### **4. Auto-Tag Generation** 🚨 **CRITICAL** (Week 2)
 
-- [ ] ⚠️ Real-time link suggestions while typing (debounced) _[API: POST /ai/link-suggestions]_
-- [ ] ⚠️ Link suggestion popup with confidence scores
-- [ ] ⚠️ One-click link acceptance
-- [ ] ⚠️ Integration with existing page references
+- [ ] ⚠️ **Automatic tag generation trigger** - On page save/update
+- [ ] ⚠️ **Tag suggestion UI** - Floating tag suggestions
+- [ ] ⚠️ **Tag management interface** - Add/remove/edit tags
+- [ ] ⚠️ **Tag display in page metadata** - Visual tag indicators
+- [ ] ⚠️ **Tag filtering in sidebar** - Filter pages by tags
 
-### **Auto-Tag Generation** 🚨 **CRITICAL**
+### **🛠️ TECHNICAL IMPLEMENTATION DETAILS**
 
-- [ ] ⚠️ Automatic tag generation for pages _[API: POST /ai/generate-tags]_
-- [ ] ⚠️ Tag suggestion UI (check if API supports accept/reject)
-- [ ] ⚠️ Tag management and display
-- [ ] ⚠️ Tag filtering in page lists
+#### **Required New Components**:
 
-### **RAG Chatbot** 🚨 **CRITICAL**
+```
+src/components/ai/
+├── chatbot/
+│   ├── ChatbotIcon.tsx
+│   ├── ChatbotModal.tsx
+│   ├── MessageList.tsx
+│   ├── MessageInput.tsx
+│   └── SuggestedPrompts.tsx
+├── auto-linking/
+│   ├── LinkSuggestionPopup.tsx
+│   └── LinkSuggestionItem.tsx
+├── editor-ai/
+│   ├── AISlashCommand.tsx
+│   ├── AIMenuPopup.tsx
+│   └── AISuggestionBar.tsx
+└── tags/
+    ├── TagSuggestions.tsx
+    ├── TagManager.tsx
+    └── TagFilter.tsx
+```
 
-- [ ] ⚠️ Chatbot icon in bottom-left corner (FontAwesome)
-- [ ] ⚠️ Chatbot popover UI (modal/overlay)
-- [ ] ⚠️ Chat interface with message history
-- [ ] ⚠️ Integration with workspace knowledge _[API: POST /ai/chat]_
-- [ ] ⚠️ Suggested prompts display
-- [ ] ⚠️ Citations and source references
-- [ ] ⚠️ Simple conversation management (no persistence required)
+#### **Required Services**:
+
+```
+src/services/
+├── ai.service.ts - All AI API calls
+├── chat.service.ts - Chat-specific operations
+└── tag.service.ts - Tag management
+```
+
+#### **Store Updates**:
+
+- [ ] ⚠️ **ChatStore** - Complete implementation with conversation management
+- [ ] ⚠️ **AILinkStore** - Real-time link suggestion management
+- [ ] ⚠️ **TagStore** - Tag generation and management
+- [ ] ⚠️ **AIStore** - General AI operations (suggestions, completion, analysis)
 
 ---
 
-## 🔗 **PHASE 4: Advanced Features** (0%)
+## 🔗 **PHASE 4: Advanced Features** (Future - Not Critical)
 
 ### **Cross-Linking & Navigation**
 
@@ -161,79 +219,70 @@
 - [ ] ❓ File attachment support
 - [ ] ❓ Image optimization and resizing
 
----
+### **Enhanced Editor Features**
 
-## 🚨 **IMMEDIATE NEXT ACTIONS** (Current Sprint)
-
-### **Week 1: AI Integration Core** 🚨 **NOW**
-
-1. **Implement `/ai` slash command in BlockNote** - Flagship AI feature
-2. **RAG Chatbot basic implementation** - Key differentiator
-3. **Auto-linking prototype** - Real-time AI assistance
-
-### **Week 2: AI Features Polish**
-
-1. **Auto-tag generation** - Content organization
-2. **AI menu completion** - Full AI feature set
-3. **Performance optimization** - Debouncing and loading states
-
-### **Week 3: Advanced Features**
-
-1. **Cross-linking system** - @mention and backlinks
-2. **Enhanced editor features** - Callouts, toggle lists
-3. **Search functionality** - Full-text and semantic search
+- [ ] ❓ Page icon selector and display
+- [ ] ❓ Cover image support
+- [ ] ❓ Dark/Light mode toggle
+- [ ] ❓ Typography themes (Serif, Sans, Mono)
 
 ---
 
-## 📝 **Notes & Considerations**
+## 🚨 **IMMEDIATE NEXT ACTIONS** (This Week)
 
-### **✅ Phase 2 Achievements**
+### **Day 1-2: RAG Chatbot Foundation**
 
-- Complete page CRUD with API integration
-- Debounced auto-save (1 second delay)
-- Page hierarchy with 2-level nesting
-- Enhanced TitleBar with workspace display and inline editing
-- Context menus for page operations (duplicate, move, delete)
-- Breadcrumb navigation for nested pages
-- Proper error handling and loading states
+1. **Implement ChatStore** - Full conversation management
+2. **Create ChatbotIcon component** - Bottom-right floating button
+3. **Build ChatbotModal** - Modern chat interface
+4. **Integrate with backend API** - POST /ai/chat endpoint
 
-### **🚀 Ready for Phase 3**
+### **Day 3-4: Auto-Linking System**
 
-- All page management foundation is solid
-- Editor integration working properly
-- Store architecture supports AI features
-- UI components ready for AI enhancements
+1. **Implement AILinkStore** - Real-time suggestions
+2. **Create LinkSuggestionPopup** - Floating suggestion UI
+3. **Add debounced typing detection** - Performance optimization
+4. **Integrate with BlockNote editor** - Seamless link insertion
 
-### **API Endpoints Available**
+### **Day 5-7: AI Menu Integration**
 
-- ✅ Complete page management (CRUD, duplicate, move)
-- ✅ All AI features (suggestions, completion, analysis, chat)
-- ✅ Workspace management
-- ✅ File upload support
-- ✅ Search functionality
+1. **Research BlockNote slash commands** - Custom command implementation
+2. **Create `/ai` command** - Trigger AI menu
+3. **Build AI menu popup** - Options for completion, analysis, etc.
+4. **Implement suggestion acceptance** - Accept/reject UI
 
-### **Technical Implementation Notes**
+---
 
-- PageStore now includes debounced auto-save with `updatePageContentDebounced()`
-- TitleBar displays workspace breadcrumbs and supports inline title editing
-- Sidebar includes hierarchical page tree with context menu operations
-- All API calls properly integrated with error handling
-- MobX observables properly implemented with runInAction
+## 📝 **Implementation Notes**
 
-### **BlockNote Integration**
+### **✅ Ready for Phase 3**
 
-- Refer to [BlockNote Documentation](https://www.blocknotejs.org/docs) for:
-  - Slash commands implementation (`/ai` command)
-  - Custom block types (callouts)
-  - Drag and drop functionality
-  - Toggle lists and tables
+- Backend has ALL AI endpoints implemented and tested
+- Frontend foundation is solid with proper store architecture
+- BlockNote editor is integrated and working
+- Authentication and workspace management complete
+
+### **🔧 Technical Considerations**
+
+- Use debouncing for real-time features (300-500ms)
+- Implement proper loading states for all AI operations
+- Add error handling for AI service failures
+- Use MobX reactions for automatic UI updates
+- Follow existing component patterns and styling
+
+### **📚 Documentation References**
+
+- [BlockNote Slash Commands](https://www.blocknotejs.org/docs/slash-menu)
+- [BlockNote Custom Blocks](https://www.blocknotejs.org/docs/custom-blocks)
+- [Mantine Modal Component](https://mantine.dev/core/modal/)
+- [FontAwesome React Icons](https://fontawesome.com/docs/web/use-with/react/)
 
 ---
 
 **Legend:**
 
 - ✅ **Complete** - Feature fully implemented and tested
-- ⚠️ **High Priority** - Critical for core functionality
-- ❓ **Medium Priority** - Important but not blocking
-- 🚨 **Immediate** - Should be worked on next
-- 🔄 **In Progress** - Currently being developed
+- ⚠️ **High Priority** - Critical for Phase 3 completion
+- ❓ **Future** - Phase 4 features (not critical)
+- 🚨 **Active** - Currently being worked on
+- 🔄 **In Progress** - Partially implemented

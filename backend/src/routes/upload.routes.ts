@@ -23,6 +23,13 @@ router.post(
   asyncHandler(UploadController.uploadCover)
 );
 
+// Upload general image for content
+router.post(
+  "/image",
+  upload.single("image"),
+  asyncHandler(UploadController.uploadImage)
+);
+
 // Delete uploaded file
 router.delete("/:fileId", asyncHandler(UploadController.deleteFile));
 

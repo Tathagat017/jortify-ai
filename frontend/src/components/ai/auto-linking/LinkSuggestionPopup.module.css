@@ -1,0 +1,264 @@
+.popup {
+  max-width: 380px;
+  min-width: 320px;
+  max-height: 400px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.12);
+  animation: fadeIn 0.2s ease-out;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* Custom scrollbar styling */
+.popup::-webkit-scrollbar {
+  width: 6px;
+}
+
+.popup::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 3px;
+}
+
+.popup::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.popup::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+/* Firefox scrollbar */
+.popup {
+  scrollbar-width: thin;
+  scrollbar-color: #c1c1c1 #f1f1f1;
+}
+
+.suggestionItem {
+  padding: 10px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  border: 1px solid transparent;
+  background: white;
+}
+
+.suggestionItem:hover {
+  background-color: #f8f8f8;
+  border-color: #e0e0e0;
+}
+
+.suggestionItem.selected {
+  background-color: #f0f0f0;
+  border-color: #333;
+}
+
+.suggestionItem.selected:hover {
+  background-color: #e8e8e8;
+}
+
+/* Header Styles */
+.headerIcon {
+  color: #333;
+}
+
+.headerText {
+  color: #333;
+}
+
+.closeButton {
+  color: #666;
+}
+
+.closeButton:hover {
+  color: #333;
+  background-color: #f0f0f0;
+}
+
+/* Item Styles */
+.itemIcon {
+  color: #666;
+  min-width: 16px;
+}
+
+.itemTitle {
+  color: #333;
+  line-height: 1.3;
+}
+
+.itemSnippet {
+  color: #666;
+  line-height: 1.3;
+}
+
+.itemSummary {
+  color: #333;
+  line-height: 1.3;
+  font-style: italic;
+}
+
+/* Section Styles */
+.sectionIcon {
+  color: #666;
+}
+
+.sectionTitle {
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Divider */
+.divider {
+  border-color: #e0e0e0;
+  margin: 8px 0;
+}
+
+/* Accept Button */
+.acceptButton {
+  background-color: #333 !important;
+  color: white !important;
+  border: none !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  padding: 4px 8px !important;
+  height: auto !important;
+  min-height: auto !important;
+  border-radius: 4px !important;
+}
+
+.acceptButton:hover {
+  background-color: #000 !important;
+}
+
+/* Confidence Badge */
+.confidenceBadge {
+  font-size: 10px;
+  font-weight: 500;
+}
+
+/* Loading and Error States */
+.loadingText {
+  color: #666;
+}
+
+.errorText {
+  color: #d32f2f;
+}
+
+.noContentText {
+  color: #999;
+}
+
+/* Footer */
+.footer {
+  border-top: 1px solid #f0f0f0;
+  padding-top: 8px;
+  margin-top: 4px;
+}
+
+.keyIcon {
+  color: #999;
+}
+
+.keyText {
+  color: #999;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dark mode support (if needed) */
+@media (prefers-color-scheme: dark) {
+  .popup {
+    background: #1a1a1a;
+    border-color: #333;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    scrollbar-color: #555 #2a2a2a; /* Dark mode scrollbar */
+  }
+
+  .popup::-webkit-scrollbar-track {
+    background: #2a2a2a;
+  }
+
+  .popup::-webkit-scrollbar-thumb {
+    background: #555;
+  }
+
+  .popup::-webkit-scrollbar-thumb:hover {
+    background: #666;
+  }
+
+  .suggestionItem {
+    background: #1a1a1a;
+  }
+
+  .suggestionItem:hover {
+    background-color: #2a2a2a;
+    border-color: #444;
+  }
+
+  .suggestionItem.selected {
+    background-color: #333;
+    border-color: #666;
+  }
+
+  .suggestionItem.selected:hover {
+    background-color: #404040;
+  }
+
+  .headerIcon,
+  .headerText,
+  .itemTitle,
+  .sectionTitle {
+    color: white;
+  }
+
+  .itemIcon,
+  .itemSnippet,
+  .sectionIcon,
+  .loadingText {
+    color: #ccc;
+  }
+
+  .itemSummary {
+    color: #ddd;
+  }
+
+  .closeButton {
+    color: #ccc;
+  }
+
+  .closeButton:hover {
+    color: white;
+    background-color: #333;
+  }
+
+  .divider {
+    border-color: #444;
+  }
+
+  .footer {
+    border-top-color: #333;
+  }
+
+  .keyIcon,
+  .keyText {
+    color: #888;
+  }
+
+  .noContentText {
+    color: #666;
+  }
+}

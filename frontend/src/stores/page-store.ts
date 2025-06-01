@@ -3,6 +3,7 @@ import { QueryClient } from "@tanstack/react-query";
 import axios, { AxiosResponse } from "axios";
 import type { PartialBlock } from "@blocknote/core";
 import editorStore from "./editor-store";
+import { UploadService } from "../services/upload.service";
 
 // Simplified BlockNote content interface for better compatibility
 export interface BlockNoteContent {
@@ -206,13 +207,25 @@ export class PageStore {
     if (!token) return null;
 
     try {
+      // Process content images if content is being updated
+      const processedUpdates = { ...updates };
+      if (updates.content) {
+        processedUpdates.content = await this.processContentImages(
+          updates.content,
+          pageId
+        );
+      }
+
       // First update the local state optimistically
       runInAction(() => {
         const pageIndex = this.pages.findIndex((p) => p.id === pageId);
         if (pageIndex !== -1) {
-          this.pages[pageIndex] = { ...this.pages[pageIndex], ...updates };
+          this.pages[pageIndex] = {
+            ...this.pages[pageIndex],
+            ...processedUpdates,
+          };
           if (this.selectedPage?.id === pageId) {
-            this.selectedPage = { ...this.selectedPage, ...updates };
+            this.selectedPage = { ...this.selectedPage, ...processedUpdates };
           }
         }
       });
@@ -220,7 +233,7 @@ export class PageStore {
       // Then make the API call (don't include user_id in updates)
       const res: AxiosResponse<Page> = await axios.put(
         `${this.baseUrl}/api/pages/${pageId}`,
-        updates,
+        processedUpdates,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -581,7 +594,9 @@ export class PageStore {
     content: PartialBlock[]
   ): Promise<boolean> {
     try {
-      await this.updatePage(pageId, { content });
+      // Process any blob URLs in the content before saving
+      const processedContent = await this.processContentImages(content, pageId);
+      await this.updatePage(pageId, { content: processedContent });
       return true;
     } catch (error) {
       console.error("Error updating page content:", error);
@@ -630,10 +645,27 @@ export class PageStore {
   // Add method to handle icon update
   async updatePageIcon(pageId: string, icon: string): Promise<boolean> {
     try {
-      // If the icon is a URL, update icon_url, otherwise update icon
-      const isUrl = icon.startsWith("http://") || icon.startsWith("https://");
-      const updateData = isUrl ? { icon_url: icon } : { icon };
-      await this.updatePage(pageId, updateData);
+      // Check if it's a blob URL that needs uploading
+      if (UploadService.isBlobUrl(icon)) {
+        const finalIconUrl = await UploadService.processAndUploadBlobImage(
+          icon,
+          pageId,
+          "icon"
+        );
+        await this.updatePage(pageId, {
+          icon_url: finalIconUrl,
+          icon: undefined,
+        });
+      }
+      // Check if it's already a permanent URL (http/https)
+      else if (icon.startsWith("http://") || icon.startsWith("https://")) {
+        await this.updatePage(pageId, { icon_url: icon, icon: undefined });
+      }
+      // Otherwise, it's an emoji or text icon
+      else {
+        await this.updatePage(pageId, { icon: icon, icon_url: undefined });
+      }
+
       return true;
     } catch (error) {
       console.error("Error updating page icon:", error);
@@ -644,13 +676,19 @@ export class PageStore {
   // Add method to handle cover image update
   async updatePageCover(pageId: string, coverImage: string): Promise<boolean> {
     try {
-      // If the cover is a URL, update cover_url, otherwise update cover_image
-      const isUrl =
-        coverImage.startsWith("http://") || coverImage.startsWith("https://");
-      const updateData = isUrl
-        ? { cover_url: coverImage }
-        : { cover_image: coverImage };
-      await this.updatePage(pageId, updateData);
+      let finalCoverUrl = coverImage;
+
+      // If it's a blob URL, upload it first
+      if (UploadService.isBlobUrl(coverImage)) {
+        finalCoverUrl = await UploadService.processAndUploadBlobImage(
+          coverImage,
+          pageId,
+          "cover"
+        );
+      }
+
+      // Update the page with the permanent URL
+      await this.updatePage(pageId, { cover_url: finalCoverUrl });
       return true;
     } catch (error) {
       console.error("Error updating page cover:", error);
@@ -658,7 +696,7 @@ export class PageStore {
     }
   }
 
-  // Add method to get workspace name for a page
+  // Get workspace name for a page
   getWorkspaceNameForPage(pageId: string): string {
     const page = this.pages.find((p) => p.id === pageId);
     if (!page) return "";
@@ -688,5 +726,44 @@ export class PageStore {
       console.error("Error saving page:", error);
       return false;
     }
+  }
+
+  // Process content to convert blob URLs to permanent URLs
+  private async processContentImages(
+    content: PartialBlock[],
+    pageId: string
+  ): Promise<PartialBlock[]> {
+    if (!content || !Array.isArray(content)) return content;
+
+    const processedContent = await Promise.all(
+      content.map(async (block) => {
+        if (
+          block.type === "image" &&
+          block.props?.url &&
+          UploadService.isBlobUrl(block.props.url)
+        ) {
+          try {
+            const permanentUrl = await UploadService.processAndUploadBlobImage(
+              block.props.url,
+              pageId,
+              "content"
+            );
+            return {
+              ...block,
+              props: {
+                ...block.props,
+                url: permanentUrl,
+              },
+            };
+          } catch (error) {
+            console.error("Error uploading image in content:", error);
+            return block; // Keep original if upload fails
+          }
+        }
+        return block;
+      })
+    );
+
+    return processedContent;
   }
 }

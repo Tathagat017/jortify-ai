@@ -4,6 +4,8 @@ import React, { useEffect } from "react";
 import Split from "react-split";
 import EditorContainer from "../components/editor/EditorContainer";
 import Sidebar from "../components/sidebar/Sidebar";
+import ChatbotIcon from "../components/ai/chatbot/ChatbotIcon";
+import ChatbotModal from "../components/ai/chatbot/ChatbotModal";
 
 import { useStore } from "../hooks/use-store";
 
@@ -106,6 +108,10 @@ const DashboardPage: React.FC = observer(() => {
           )}
         </Box>
       </Box>
+
+      {/* AI Chatbot Components */}
+      <ChatbotIcon />
+      <ChatbotModal />
     </>
   );
 });

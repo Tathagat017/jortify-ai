@@ -116,6 +116,12 @@ Respond with only the suggestions in JSON format:
     pageId?: string
   ): Promise<LinkSuggestion[]> {
     try {
+      console.log("🔍 AIService.generateLinkSuggestions called with:", {
+        text,
+        workspaceId,
+        pageId,
+      });
+
       // Import SummaryService dynamically to avoid circular dependencies
       const { SummaryService } = await import("./summary.service");
 
@@ -126,6 +132,11 @@ Respond with only the suggestions in JSON format:
           workspaceId,
           pageId
         );
+
+      console.log("📊 Enhanced suggestions from SummaryService:", {
+        count: enhancedSuggestions.length,
+        suggestions: enhancedSuggestions,
+      });
 
       // Convert to LinkSuggestion format
       const linkSuggestions: LinkSuggestion[] = enhancedSuggestions.map(
@@ -152,15 +163,39 @@ Respond with only the suggestions in JSON format:
 
       // If we have enhanced suggestions, return them
       if (linkSuggestions.length > 0) {
+        console.log("✅ Returning enhanced suggestions:", linkSuggestions);
         return linkSuggestions;
       }
 
+      console.log(
+        "⚠️ No enhanced suggestions found, falling back to basic method"
+      );
       // Fallback to basic link suggestions if no enhanced suggestions found
-      return this.generateBasicLinkSuggestions(text, workspaceId, pageId);
+      const basicSuggestions = await this.generateBasicLinkSuggestions(
+        text,
+        workspaceId,
+        pageId
+      );
+      console.log("📋 Basic suggestions result:", {
+        count: basicSuggestions.length,
+        suggestions: basicSuggestions,
+      });
+
+      return basicSuggestions;
     } catch (error) {
-      console.error("Error generating enhanced link suggestions:", error);
+      console.error("❌ Error generating enhanced link suggestions:", error);
       // Fallback to basic suggestions
-      return this.generateBasicLinkSuggestions(text, workspaceId, pageId);
+      console.log("🔄 Falling back to basic suggestions due to error");
+      const basicSuggestions = await this.generateBasicLinkSuggestions(
+        text,
+        workspaceId,
+        pageId
+      );
+      console.log("📋 Fallback basic suggestions result:", {
+        count: basicSuggestions.length,
+        suggestions: basicSuggestions,
+      });
+      return basicSuggestions;
     }
   }
 
@@ -173,6 +208,12 @@ Respond with only the suggestions in JSON format:
     pageId?: string
   ): Promise<LinkSuggestion[]> {
     try {
+      console.log("🔧 generateBasicLinkSuggestions called with:", {
+        text,
+        workspaceId,
+        pageId,
+      });
+
       // Get all pages in workspace for potential linking
       const { data: pages, error } = await supabase
         .from("pages")
@@ -182,19 +223,27 @@ Respond with only the suggestions in JSON format:
         .limit(50);
 
       if (error || !pages) {
+        console.log("❌ Error fetching pages or no pages found:", error);
         return [];
       }
 
+      console.log("📄 Found pages for linking:", {
+        count: pages.length,
+        titles: pages.map((p) => p.title),
+      });
+
       const suggestions: LinkSuggestion[] = [];
+      const textLower = text.toLowerCase();
 
       for (const page of pages) {
-        // Simple keyword matching
         const pageTitle = page.title.toLowerCase();
-        const textLower = text.toLowerCase();
 
-        // Check if page title appears in text
+        console.log(`🔍 Checking page "${page.title}" against text "${text}"`);
+
+        // Check if page title appears in text (exact match)
         const titleIndex = textLower.indexOf(pageTitle);
         if (titleIndex !== -1 && pageTitle.length > 2) {
+          console.log(`✅ Found exact title match: "${page.title}"`);
           suggestions.push({
             text: page.title,
             pageId: page.id,
@@ -211,6 +260,9 @@ Respond with only the suggestions in JSON format:
           if (word.length > 3 && textLower.includes(word.toLowerCase())) {
             const wordIndex = textLower.indexOf(word.toLowerCase());
             if (wordIndex !== -1) {
+              console.log(
+                `✅ Found word match: "${word}" from page "${page.title}"`
+              );
               suggestions.push({
                 text: word,
                 pageId: page.id,
@@ -218,6 +270,60 @@ Respond with only the suggestions in JSON format:
                 confidence: 0.6,
                 startIndex: wordIndex,
                 endIndex: wordIndex + word.length,
+              });
+            }
+          }
+        }
+
+        // NEW: More flexible matching for @link trigger
+        // If the text is generic (like "link to relevant page"), suggest all pages
+        if (
+          text.toLowerCase().includes("link") ||
+          text.toLowerCase().includes("relevant") ||
+          text.toLowerCase().includes("page")
+        ) {
+          console.log(
+            `🔗 Generic link text detected, suggesting page: "${page.title}"`
+          );
+          suggestions.push({
+            text: page.title,
+            pageId: page.id,
+            pageTitle: page.title,
+            confidence: 0.5, // Lower confidence for generic suggestions
+            startIndex: 0,
+            endIndex: page.title.length,
+          });
+        }
+
+        // NEW: Semantic matching for common business terms
+        const businessTerms = [
+          "sales",
+          "marketing",
+          "product",
+          "channel",
+          "customer",
+          "revenue",
+          "strategy",
+        ];
+        const textWords = textLower.split(/\s+/);
+        const titleWords = pageTitle.split(/\s+/);
+
+        for (const textWord of textWords) {
+          for (const titleWord of titleWords) {
+            if (
+              businessTerms.includes(textWord) &&
+              businessTerms.includes(titleWord)
+            ) {
+              console.log(
+                `🏢 Business term match: "${textWord}" matches "${titleWord}" in page "${page.title}"`
+              );
+              suggestions.push({
+                text: page.title,
+                pageId: page.id,
+                pageTitle: page.title,
+                confidence: 0.7,
+                startIndex: 0,
+                endIndex: page.title.length,
               });
             }
           }
@@ -237,9 +343,15 @@ Respond with only the suggestions in JSON format:
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, 10); // Limit to top 10 suggestions
 
+      console.log("📊 Final basic suggestions:", {
+        totalSuggestions: suggestions.length,
+        uniqueSuggestions: uniqueSuggestions.length,
+        suggestions: uniqueSuggestions,
+      });
+
       return uniqueSuggestions;
     } catch (error) {
-      console.error("Error generating basic link suggestions:", error);
+      console.error("❌ Error generating basic link suggestions:", error);
       return [];
     }
   }
