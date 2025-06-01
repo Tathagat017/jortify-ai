@@ -124,6 +124,16 @@ const LinkSuggestionPopup: React.FC<LinkSuggestionPopupProps> = observer(
       const isSelected = index === aiLinkStore.selectedIndex;
       const isLinkSuggestion = "pageId" in item;
 
+      // DEBUG: Log summary information
+      console.log(`🎨 Rendering suggestion item:`, {
+        title: isLinkSuggestion ? item.pageTitle : item.title,
+        isAISuggestion,
+        isLinkSuggestion,
+        hasSummary: !!item.summary,
+        summary: item.summary,
+        summaryLength: item.summary?.length || 0,
+      });
+
       return (
         <Box
           key={isLinkSuggestion ? item.pageId : item.id}

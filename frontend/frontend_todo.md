@@ -108,7 +108,7 @@
 
 ### **🚨 CRITICAL IMPLEMENTATION ORDER**
 
-#### **1. RAG Chatbot** 🚨 **HIGHEST PRIORITY** (Week 1)
+#### **1. RAG Chatbot** 🚨 **HIGHEST PRIORITY**
 
 - [ ] ⚠️ **ChatStore implementation** - Full MobX store with conversation management
 - [ ] ⚠️ **Chatbot icon in bottom-right corner** (FontAwesome robot icon)
@@ -119,7 +119,7 @@
 - [ ] ⚠️ **Citations and source references** - Link to source pages
 - [ ] ⚠️ **Conversation management** - Create/delete/rename conversations
 
-#### **2. Auto-Linking System** 🚨 **CRITICAL** (Week 1)
+#### **2. Auto-Linking System** 🚨 **CRITICAL**
 
 - [ ] ⚠️ **AILinkStore implementation** - Real-time link suggestions
 - [ ] ⚠️ **Link suggestion popup** - Floating UI with confidence scores
@@ -127,7 +127,7 @@
 - [ ] ⚠️ **One-click link acceptance** - Seamless integration
 - [ ] ⚠️ **Integration with BlockNote editor** - Inline suggestions
 
-#### **3. AI Menu in BlockNote Editor** 🚨 **CRITICAL** (Week 2)
+#### **3. AI Menu in BlockNote Editor** 🚨 **CRITICAL**
 
 - [ ] ⚠️ **`/ai` slash command implementation** - Custom BlockNote command
 - [ ] ⚠️ **AI menu popup with options**:
@@ -138,7 +138,7 @@
 - [ ] ⚠️ **AI suggestion acceptance/rejection UI** - Accept/reject buttons
 - [ ] ⚠️ **Loading states for AI operations** - Skeleton loaders
 
-#### **4. Auto-Tag Generation** 🚨 **CRITICAL** (Week 2)
+#### **4. Auto-Tag Generation** 🚨 **CRITICAL**
 
 - [ ] ⚠️ **Automatic tag generation trigger** - On page save/update
 - [ ] ⚠️ **Tag suggestion UI** - Floating tag suggestions
@@ -230,26 +230,27 @@ src/services/
 
 ## 🚨 **IMMEDIATE NEXT ACTIONS** (This Week)
 
-### **Day 1-2: RAG Chatbot Foundation**
+RAG Chatbot Foundation\*\*
 
 1. **Implement ChatStore** - Full conversation management
 2. **Create ChatbotIcon component** - Bottom-right floating button
 3. **Build ChatbotModal** - Modern chat interface
 4. **Integrate with backend API** - POST /ai/chat endpoint
 
-### **Day 3-4: Auto-Linking System**
+Auto-Linking System\*\*
 
 1. **Implement AILinkStore** - Real-time suggestions
 2. **Create LinkSuggestionPopup** - Floating suggestion UI
 3. **Add debounced typing detection** - Performance optimization
 4. **Integrate with BlockNote editor** - Seamless link insertion
 
-### **Day 5-7: AI Menu Integration**
+AI Menu Integration\*\*
 
 1. **Research BlockNote slash commands** - Custom command implementation
 2. **Create `/ai` command** - Trigger AI menu
 3. **Build AI menu popup** - Options for completion, analysis, etc.
 4. **Implement suggestion acceptance** - Accept/reject UI
+5. **use as reference : https://www.blocknotejs.org/docs/ai/custom-commands 6.**use as reference : https://www.blocknotejs.org/docs/ai/getting-started
 
 ---
 

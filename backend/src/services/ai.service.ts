@@ -118,17 +118,55 @@ Respond with only the suggestions in JSON format:
     try {
       console.log("🔍 AIService.generateLinkSuggestions called with:", {
         text,
+        textLength: text.length,
         workspaceId,
         pageId,
       });
 
+      // ENHANCED: If the provided text is too short, try to get more context from the current page
+      let enhancedText = text;
+      if (text.length < 100 && pageId) {
+        console.log(
+          "📄 Text too short, fetching additional context from current page..."
+        );
+        try {
+          const { data: currentPage, error } = await supabase
+            .from("pages")
+            .select("title, content")
+            .eq("id", pageId)
+            .single();
+
+          if (!error && currentPage) {
+            // Extract text from current page content
+            const pageText = this.extractTextFromPageContent(
+              currentPage.title,
+              currentPage.content
+            );
+
+            // Use the last 500 characters of the page as additional context
+            const additionalContext = pageText.slice(-500);
+            enhancedText = additionalContext + " " + text;
+
+            console.log("📄 Enhanced text with page context:", {
+              originalLength: text.length,
+              enhancedLength: enhancedText.length,
+              additionalContext: additionalContext.substring(0, 200) + "...",
+            });
+          }
+        } catch (error) {
+          console.warn("Could not fetch additional page context:", error);
+        }
+      }
+
+      console.log("🤖 ATTEMPTING RAG (AI-ENHANCED) SUGGESTIONS FIRST...");
+
       // Import SummaryService dynamically to avoid circular dependencies
       const { SummaryService } = await import("./summary.service");
 
-      // Use the enhanced summary-based link suggestions
+      // Use the enhanced summary-based link suggestions with enhanced text
       const enhancedSuggestions =
         await SummaryService.getEnhancedLinkSuggestions(
-          text,
+          enhancedText,
           workspaceId,
           pageId
         );
@@ -141,7 +179,7 @@ Respond with only the suggestions in JSON format:
       // Convert to LinkSuggestion format
       const linkSuggestions: LinkSuggestion[] = enhancedSuggestions.map(
         (suggestion) => {
-          const startIndex = text
+          const startIndex = enhancedText
             .toLowerCase()
             .indexOf(suggestion.suggestedText.toLowerCase());
 
@@ -163,16 +201,21 @@ Respond with only the suggestions in JSON format:
 
       // If we have enhanced suggestions, return them
       if (linkSuggestions.length > 0) {
+        console.log(
+          "✅ 🤖 USING RAG (AI-ENHANCED) SUGGESTIONS - AI summaries found and processed successfully!"
+        );
         console.log("✅ Returning enhanced suggestions:", linkSuggestions);
         return linkSuggestions;
       }
 
       console.log(
-        "⚠️ No enhanced suggestions found, falling back to basic method"
+        "⚠️ 🤖 RAG (AI-ENHANCED) SUGGESTIONS FAILED - No AI summaries available or no matches found"
       );
+      console.log("🔄 FALLING BACK TO STRING MATCHING ALGORITHM...");
+
       // Fallback to basic link suggestions if no enhanced suggestions found
       const basicSuggestions = await this.generateBasicLinkSuggestions(
-        text,
+        enhancedText, // Use enhanced text for better string matching too
         workspaceId,
         pageId
       );
@@ -184,8 +227,12 @@ Respond with only the suggestions in JSON format:
       return basicSuggestions;
     } catch (error) {
       console.error("❌ Error generating enhanced link suggestions:", error);
+      console.log(
+        "🔄 🤖 RAG (AI-ENHANCED) SUGGESTIONS ERROR - Falling back to string matching due to error"
+      );
+
       // Fallback to basic suggestions
-      console.log("🔄 Falling back to basic suggestions due to error");
+      console.log("🔄 FALLING BACK TO STRING MATCHING ALGORITHM...");
       const basicSuggestions = await this.generateBasicLinkSuggestions(
         text,
         workspaceId,
@@ -200,6 +247,41 @@ Respond with only the suggestions in JSON format:
   }
 
   /**
+   * Extract text content from page content (similar to EmbeddingService but simpler)
+   */
+  private static extractTextFromPageContent(
+    title: string,
+    content: any
+  ): string {
+    let text = title + "\n\n";
+
+    if (content && typeof content === "object") {
+      // If content is BlockNote format, extract text from blocks
+      if (Array.isArray(content)) {
+        for (const block of content) {
+          if (block.content && Array.isArray(block.content)) {
+            const blockText = block.content
+              .map((item: any) => item.text || "")
+              .join(" ");
+            text += blockText + "\n";
+          } else if (block.type === "heading" && block.content) {
+            // Handle heading blocks
+            const headingText = Array.isArray(block.content)
+              ? block.content.map((item: any) => item.text || "").join(" ")
+              : String(block.content);
+            text += headingText + "\n";
+          }
+        }
+      } else {
+        // Fallback: convert entire content to string
+        text += JSON.stringify(content);
+      }
+    }
+
+    return text.trim();
+  }
+
+  /**
    * Basic link suggestions (fallback method)
    */
   private static async generateBasicLinkSuggestions(
@@ -208,16 +290,17 @@ Respond with only the suggestions in JSON format:
     pageId?: string
   ): Promise<LinkSuggestion[]> {
     try {
+      console.log("🔧 📝 USING STRING MATCHING ALGORITHM (FALLBACK METHOD)");
       console.log("🔧 generateBasicLinkSuggestions called with:", {
         text,
         workspaceId,
         pageId,
       });
 
-      // Get all pages in workspace for potential linking
+      // FIXED: Include summary in the query so we can show summaries in fallback suggestions
       const { data: pages, error } = await supabase
         .from("pages")
-        .select("id, title, content")
+        .select("id, title, content, summary")
         .eq("workspace_id", workspaceId)
         .neq("id", pageId || "") // Exclude current page
         .limit(50);
@@ -230,6 +313,7 @@ Respond with only the suggestions in JSON format:
       console.log("📄 Found pages for linking:", {
         count: pages.length,
         titles: pages.map((p) => p.title),
+        pagesWithSummaries: pages.filter((p) => p.summary).length,
       });
 
       const suggestions: LinkSuggestion[] = [];
@@ -243,7 +327,9 @@ Respond with only the suggestions in JSON format:
         // Check if page title appears in text (exact match)
         const titleIndex = textLower.indexOf(pageTitle);
         if (titleIndex !== -1 && pageTitle.length > 2) {
-          console.log(`✅ Found exact title match: "${page.title}"`);
+          console.log(
+            `✅ 📝 STRING MATCH FOUND - Exact title match: "${page.title}"`
+          );
           suggestions.push({
             text: page.title,
             pageId: page.id,
@@ -251,6 +337,7 @@ Respond with only the suggestions in JSON format:
             confidence: pageTitle.length > 5 ? 0.9 : 0.7,
             startIndex: titleIndex,
             endIndex: titleIndex + pageTitle.length,
+            summary: page.summary || undefined, // FIXED: Include summary from database
           });
         }
 
@@ -261,7 +348,7 @@ Respond with only the suggestions in JSON format:
             const wordIndex = textLower.indexOf(word.toLowerCase());
             if (wordIndex !== -1) {
               console.log(
-                `✅ Found word match: "${word}" from page "${page.title}"`
+                `✅ 📝 STRING MATCH FOUND - Word match: "${word}" from page "${page.title}"`
               );
               suggestions.push({
                 text: word,
@@ -270,6 +357,7 @@ Respond with only the suggestions in JSON format:
                 confidence: 0.6,
                 startIndex: wordIndex,
                 endIndex: wordIndex + word.length,
+                summary: page.summary || undefined, // FIXED: Include summary from database
               });
             }
           }
@@ -283,7 +371,7 @@ Respond with only the suggestions in JSON format:
           text.toLowerCase().includes("page")
         ) {
           console.log(
-            `🔗 Generic link text detected, suggesting page: "${page.title}"`
+            `🔗 📝 STRING MATCH FOUND - Generic link text detected, suggesting page: "${page.title}"`
           );
           suggestions.push({
             text: page.title,
@@ -292,6 +380,7 @@ Respond with only the suggestions in JSON format:
             confidence: 0.5, // Lower confidence for generic suggestions
             startIndex: 0,
             endIndex: page.title.length,
+            summary: page.summary || undefined, // FIXED: Include summary from database
           });
         }
 
@@ -315,7 +404,7 @@ Respond with only the suggestions in JSON format:
               businessTerms.includes(titleWord)
             ) {
               console.log(
-                `🏢 Business term match: "${textWord}" matches "${titleWord}" in page "${page.title}"`
+                `🏢 📝 STRING MATCH FOUND - Business term match: "${textWord}" matches "${titleWord}" in page "${page.title}"`
               );
               suggestions.push({
                 text: page.title,
@@ -324,6 +413,7 @@ Respond with only the suggestions in JSON format:
                 confidence: 0.7,
                 startIndex: 0,
                 endIndex: page.title.length,
+                summary: page.summary || undefined, // FIXED: Include summary from database
               });
             }
           }
@@ -343,11 +433,21 @@ Respond with only the suggestions in JSON format:
         .sort((a, b) => b.confidence - a.confidence)
         .slice(0, 10); // Limit to top 10 suggestions
 
-      console.log("📊 Final basic suggestions:", {
+      console.log("📊 📝 STRING MATCHING ALGORITHM RESULTS:", {
         totalSuggestions: suggestions.length,
         uniqueSuggestions: uniqueSuggestions.length,
         suggestions: uniqueSuggestions,
+        suggestionsWithSummaries: uniqueSuggestions.filter((s) => s.summary)
+          .length,
       });
+
+      if (uniqueSuggestions.length > 0) {
+        console.log(
+          "✅ 📝 STRING MATCHING SUCCESSFUL - Returning string-based suggestions with summaries"
+        );
+      } else {
+        console.log("❌ 📝 STRING MATCHING FAILED - No string matches found");
+      }
 
       return uniqueSuggestions;
     } catch (error) {

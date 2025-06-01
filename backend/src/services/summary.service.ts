@@ -176,6 +176,9 @@ export class SummaryService {
     }>
   > {
     try {
+      console.log(
+        "🔍 🤖 RAG (AI-ENHANCED) PROCESSING - SummaryService.getEnhancedLinkSuggestions called"
+      );
       console.log("🔍 SummaryService.getEnhancedLinkSuggestions called with:", {
         text,
         workspaceId,
@@ -192,26 +195,41 @@ export class SummaryService {
         .not("summary", "is", null)
         .limit(20);
 
-      console.log("📄 Query result for pages with summaries:", {
-        error,
-        pagesCount: pages?.length || 0,
-        pages:
-          pages?.map((p) => ({
-            id: p.id,
-            title: p.title,
-            hasSummary: !!p.summary,
-          })) || [],
-      });
+      console.log(
+        "📄 🤖 RAG QUERY - Searching for pages with AI-generated summaries:",
+        {
+          error,
+          pagesCount: pages?.length || 0,
+          pages:
+            pages?.map((p) => ({
+              id: p.id,
+              title: p.title,
+              hasSummary: !!p.summary,
+            })) || [],
+        }
+      );
 
       if (error || !pages) {
-        console.error("❌ Error fetching pages for link suggestions:", error);
+        console.error(
+          "❌ 🤖 RAG FAILED - Error fetching pages for link suggestions:",
+          error
+        );
         return [];
       }
 
       if (pages.length === 0) {
-        console.log("⚠️ No pages with summaries found in workspace");
+        console.log(
+          "⚠️ 🤖 RAG FAILED - No pages with AI-generated summaries found in workspace"
+        );
+        console.log(
+          "⚠️ 🤖 RAG REQUIRES AI SUMMARIES - Pages need AI-generated summaries for enhanced suggestions"
+        );
         return [];
       }
+
+      console.log(
+        `✅ 🤖 RAG PROCESSING - Found ${pages.length} pages with AI-generated summaries, analyzing relevance...`
+      );
 
       // Use AI to analyze context and suggest relevant links
       const suggestions = await this.analyzeLinkRelevance(
@@ -220,25 +238,44 @@ export class SummaryService {
         contextWindow
       );
 
-      console.log("🤖 analyzeLinkRelevance returned:", {
-        suggestionsCount: suggestions.length,
-        suggestions,
-      });
+      console.log(
+        "🤖 🧠 RAG ANALYSIS COMPLETE - analyzeLinkRelevance returned:",
+        {
+          suggestionsCount: suggestions.length,
+          suggestions,
+        }
+      );
 
       const filteredSuggestions = suggestions
         .filter((suggestion) => suggestion.confidence > 0.6) // Only return high-confidence suggestions
         .sort((a, b) => b.relevanceScore - a.relevanceScore)
         .slice(0, 8); // Limit to top 8 suggestions
 
-      console.log("📊 Final enhanced suggestions after filtering:", {
-        originalCount: suggestions.length,
-        filteredCount: filteredSuggestions.length,
-        suggestions: filteredSuggestions,
-      });
+      console.log(
+        "📊 🤖 RAG FINAL RESULTS - Enhanced suggestions after filtering:",
+        {
+          originalCount: suggestions.length,
+          filteredCount: filteredSuggestions.length,
+          suggestions: filteredSuggestions,
+        }
+      );
+
+      if (filteredSuggestions.length > 0) {
+        console.log(
+          "✅ 🤖 RAG SUCCESS - AI-enhanced suggestions generated successfully using AI summaries!"
+        );
+      } else {
+        console.log(
+          "❌ 🤖 RAG FAILED - No high-confidence AI suggestions found (confidence < 0.6)"
+        );
+      }
 
       return filteredSuggestions;
     } catch (error) {
-      console.error("❌ Error getting enhanced link suggestions:", error);
+      console.error(
+        "❌ 🤖 RAG ERROR - Error getting enhanced link suggestions:",
+        error
+      );
       return [];
     }
   }
@@ -302,31 +339,111 @@ export class SummaryService {
 
     let score = 0;
 
+    console.log(
+      `🧮 Calculating relevance for "${pageTitle}" against context:`,
+      {
+        textLength: text.length,
+        textPreview: text.substring(0, 100) + "...",
+        pageTitle,
+        summaryPreview: pageSummary.substring(0, 100) + "...",
+      }
+    );
+
     // Exact title match gets highest score
     if (textLower.includes(titleLower)) {
       score += 0.8;
+      console.log(
+        `✅ Exact title match found for "${pageTitle}" - adding 0.8 to score`
+      );
     }
 
-    // Partial title word matches
+    // Partial title word matches (improved for longer context)
     const titleWords = titleLower.split(" ").filter((word) => word.length > 3);
     const matchingTitleWords = titleWords.filter((word) =>
       textLower.includes(word)
     );
-    score += (matchingTitleWords.length / Math.max(titleWords.length, 1)) * 0.4;
+    const titleWordScore =
+      (matchingTitleWords.length / Math.max(titleWords.length, 1)) * 0.4;
+    score += titleWordScore;
 
-    // Summary keyword matches
+    if (matchingTitleWords.length > 0) {
+      console.log(`✅ Title word matches for "${pageTitle}":`, {
+        matchingWords: matchingTitleWords,
+        scoreAdded: titleWordScore,
+      });
+    }
+
+    // Enhanced summary keyword matches (better for longer context)
     const summaryWords = summaryLower
       .split(" ")
       .filter((word) => word.length > 4)
-      .slice(0, 20); // Take first 20 meaningful words
+      .slice(0, 30); // Increased from 20 to 30 for better coverage
 
     const matchingSummaryWords = summaryWords.filter((word) =>
       textLower.includes(word)
     );
-    score +=
+    const summaryWordScore =
       (matchingSummaryWords.length / Math.max(summaryWords.length, 1)) * 0.3;
+    score += summaryWordScore;
 
-    return Math.min(score, 1.0);
+    if (matchingSummaryWords.length > 0) {
+      console.log(`✅ Summary word matches for "${pageTitle}":`, {
+        matchingWords: matchingSummaryWords.slice(0, 5), // Show first 5 matches
+        totalMatches: matchingSummaryWords.length,
+        scoreAdded: summaryWordScore,
+      });
+    }
+
+    // NEW: Contextual phrase matching (for longer text contexts)
+    // Look for 2-3 word phrases that match between text and summary
+    const textPhrases = this.extractPhrases(textLower, 2, 3);
+    const summaryPhrases = this.extractPhrases(summaryLower, 2, 3);
+    const titlePhrases = this.extractPhrases(titleLower, 2, 3);
+
+    const phraseMatches = textPhrases.filter(
+      (phrase) =>
+        summaryPhrases.includes(phrase) || titlePhrases.includes(phrase)
+    );
+
+    if (phraseMatches.length > 0) {
+      const phraseScore = Math.min(phraseMatches.length * 0.1, 0.3); // Max 0.3 bonus
+      score += phraseScore;
+      console.log(`✅ Phrase matches for "${pageTitle}":`, {
+        matchingPhrases: phraseMatches.slice(0, 3),
+        scoreAdded: phraseScore,
+      });
+    }
+
+    const finalScore = Math.min(score, 1.0);
+    console.log(
+      `📊 Final relevance score for "${pageTitle}": ${finalScore.toFixed(3)}`
+    );
+
+    return finalScore;
+  }
+
+  /**
+   * Extract meaningful phrases from text for better matching
+   */
+  private static extractPhrases(
+    text: string,
+    minWords: number,
+    maxWords: number
+  ): string[] {
+    const words = text.split(/\s+/).filter((word) => word.length > 3);
+    const phrases: string[] = [];
+
+    for (let wordCount = minWords; wordCount <= maxWords; wordCount++) {
+      for (let i = 0; i <= words.length - wordCount; i++) {
+        const phrase = words.slice(i, i + wordCount).join(" ");
+        if (phrase.length > 8) {
+          // Only meaningful phrases
+          phrases.push(phrase);
+        }
+      }
+    }
+
+    return phrases;
   }
 
   /**

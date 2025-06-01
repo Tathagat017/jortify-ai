@@ -196,6 +196,18 @@ export class AILinkStore {
 
       console.log("🤖 AI service returned suggestions:", suggestions);
 
+      // DEBUG: Log summary information for each suggestion
+      console.log("🔍 Debugging suggestion summaries:", {
+        totalSuggestions: suggestions.length,
+        suggestionsWithSummaries: suggestions.filter((s) => s.summary).length,
+        summaryDetails: suggestions.map((s) => ({
+          pageTitle: s.pageTitle,
+          hasSummary: !!s.summary,
+          summaryLength: s.summary?.length || 0,
+          summaryPreview: s.summary?.substring(0, 50) + "..." || "No summary",
+        })),
+      });
+
       runInAction(() => {
         this.suggestions = suggestions.slice(0, this.MAX_SUGGESTIONS);
         this.isLoading = false;

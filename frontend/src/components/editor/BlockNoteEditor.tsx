@@ -75,13 +75,99 @@ const BlockNoteEditorComponent = () => {
       if (text.toLowerCase().includes("@link")) {
         const position = getCursorPosition();
 
-        // Set current text for AI suggestions (extract context around @link)
-        const linkIndex = text.toLowerCase().indexOf("@link");
-        const contextStart = Math.max(0, linkIndex - 50);
-        const contextEnd = Math.min(text.length, linkIndex + 50);
-        const contextText = text.substring(contextStart, contextEnd);
+        // IMPROVED: Extract much more context for better AI suggestions
+        // Instead of just 100 characters, get the entire current block + surrounding blocks
+        try {
+          const blocks = editor.topLevelBlocks;
+          let enhancedContext = "";
+          let currentBlockIndex = -1;
 
-        aiLinkStore.setCurrentText(contextText);
+          // Find the block containing @link
+          for (let i = 0; i < blocks.length; i++) {
+            const block = blocks[i];
+            if (block.type === "paragraph" && block.content) {
+              const blockText = JSON.stringify(block.content)
+                .replace(/[{}"[\]]/g, " ")
+                .trim();
+
+              if (blockText.toLowerCase().includes("@link")) {
+                currentBlockIndex = i;
+                break;
+              }
+            }
+          }
+
+          if (currentBlockIndex !== -1) {
+            // Get context: 2 blocks before + current block + 2 blocks after
+            const contextStart = Math.max(0, currentBlockIndex - 2);
+            const contextEnd = Math.min(blocks.length, currentBlockIndex + 3);
+
+            for (let i = contextStart; i < contextEnd; i++) {
+              const block = blocks[i];
+              if (block.type === "paragraph" && block.content) {
+                const blockText = JSON.stringify(block.content)
+                  .replace(/[{}"[\]]/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+
+                if (blockText) {
+                  enhancedContext += blockText + "\n";
+                }
+              } else if (block.type === "heading" && block.content) {
+                // Include headings for better context
+                const headingText = JSON.stringify(block.content)
+                  .replace(/[{}"[\]]/g, " ")
+                  .replace(/\s+/g, " ")
+                  .trim();
+
+                if (headingText) {
+                  enhancedContext += "# " + headingText + "\n";
+                }
+              }
+            }
+          }
+
+          // Fallback: if we couldn't find the block or get good context,
+          // use a larger window around @link (500 characters instead of 100)
+          if (!enhancedContext.trim()) {
+            const linkIndex = text.toLowerCase().indexOf("@link");
+            const contextStart = Math.max(0, linkIndex - 250);
+            const contextEnd = Math.min(text.length, linkIndex + 250);
+            enhancedContext = text.substring(contextStart, contextEnd);
+          }
+
+          // Ensure we have at least some meaningful context
+          const finalContext =
+            enhancedContext.trim() ||
+            text.substring(0, Math.min(500, text.length));
+
+          console.log("📝 Enhanced context for AI suggestions:", {
+            originalTextLength: text.length,
+            enhancedContextLength: finalContext.length,
+            context: finalContext,
+            blocksAnalyzed:
+              currentBlockIndex !== -1
+                ? `Block ${currentBlockIndex} + surrounding`
+                : "Fallback text window",
+          });
+
+          aiLinkStore.setCurrentText(finalContext);
+        } catch (error) {
+          console.error("Error extracting enhanced context:", error);
+
+          // Fallback to improved simple extraction (500 chars instead of 100)
+          const linkIndex = text.toLowerCase().indexOf("@link");
+          const contextStart = Math.max(0, linkIndex - 250);
+          const contextEnd = Math.min(text.length, linkIndex + 250);
+          const fallbackContext = text.substring(contextStart, contextEnd);
+
+          console.log("📝 Using fallback context:", {
+            contextLength: fallbackContext.length,
+            context: fallbackContext,
+          });
+
+          aiLinkStore.setCurrentText(fallbackContext);
+        }
 
         // Trigger with page store
         aiLinkStore.handleLinkTrigger(
@@ -97,6 +183,7 @@ const BlockNoteEditorComponent = () => {
       pageStore,
       aiLinkStore,
       getCursorPosition,
+      editor, // Add editor to dependencies
     ]
   );
 
