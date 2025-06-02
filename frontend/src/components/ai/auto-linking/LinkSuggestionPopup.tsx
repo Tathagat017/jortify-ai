@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { observer } from "mobx-react-lite";
 import {
   Paper,
@@ -43,6 +43,64 @@ const LinkSuggestionPopup: React.FC<LinkSuggestionPopupProps> = observer(
   ({ onAccept, onReject }) => {
     const { aiLinkStore } = useStore();
     const popupRef = useRef<HTMLDivElement>(null);
+    const [popupPosition, setPopupPosition] = useState<{
+      x: number;
+      y: number;
+      isAbove: boolean;
+    }>({ x: 0, y: 0, isAbove: false });
+
+    // Calculate optimal popup position
+    useEffect(() => {
+      if (!aiLinkStore.isVisible || !aiLinkStore.position) return;
+
+      const calculatePosition = () => {
+        const { x, y } = aiLinkStore.position!;
+        const popupHeight = 400; // Max height from CSS
+        const popupWidth = 380; // Max width from CSS
+        const margin = 10; // Safety margin
+
+        const viewportHeight = window.innerHeight;
+        const viewportWidth = window.innerWidth;
+
+        // Check if popup would go below viewport
+        const spaceBelow = viewportHeight - y;
+        const spaceAbove = y;
+
+        let finalX = x;
+        let finalY = y + 25; // Default: below cursor
+        let isAbove = false;
+
+        // Position above if not enough space below
+        if (
+          spaceBelow < popupHeight + margin &&
+          spaceAbove > popupHeight + margin
+        ) {
+          finalY = y - popupHeight - 10; // Above cursor
+          isAbove = true;
+          console.log(
+            "🔄 Positioning popover above cursor due to insufficient space below"
+          );
+        }
+
+        // Adjust horizontal position if needed
+        if (finalX + popupWidth > viewportWidth - margin) {
+          finalX = viewportWidth - popupWidth - margin;
+        }
+        if (finalX < margin) {
+          finalX = margin;
+        }
+
+        setPopupPosition({ x: finalX, y: finalY, isAbove });
+      };
+
+      calculatePosition();
+
+      // Recalculate on window resize
+      const handleResize = () => calculatePosition();
+      window.addEventListener("resize", handleResize);
+
+      return () => window.removeEventListener("resize", handleResize);
+    }, [aiLinkStore.isVisible, aiLinkStore.position]);
 
     // Handle keyboard navigation
     useEffect(() => {
@@ -211,8 +269,8 @@ const LinkSuggestionPopup: React.FC<LinkSuggestionPopupProps> = observer(
         className={classes.popup}
         style={{
           position: "fixed",
-          left: aiLinkStore.position?.x || 0,
-          top: (aiLinkStore.position?.y || 0) + 25,
+          left: popupPosition.x,
+          top: popupPosition.y,
           zIndex: 1000,
         }}
         shadow="lg"

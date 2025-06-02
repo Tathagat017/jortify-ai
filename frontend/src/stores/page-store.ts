@@ -3,7 +3,6 @@ import { QueryClient } from "@tanstack/react-query";
 import axiosInstance from "../lib/axios";
 import { AxiosResponse } from "axios";
 import type { PartialBlock } from "@blocknote/core";
-import editorStore from "./editor-store";
 import { UploadService } from "../services/upload.service";
 
 // Simplified BlockNote content interface for better compatibility
@@ -67,6 +66,7 @@ export class PageStore {
   private autoTagTimeout: NodeJS.Timeout | null = null;
   private typingTimeout: NodeJS.Timeout | null = null;
   private isUserTyping: boolean = false;
+  private hasContentBeenEdited: boolean = false; // Track if content has been edited
 
   constructor(queryClient: QueryClient) {
     makeAutoObservable(this);
@@ -488,13 +488,13 @@ export class PageStore {
   selectPage(page: Page) {
     runInAction(() => {
       this.selectedPage = page;
-      // Update URL without full page reload
-      window.history.pushState({}, "", `/dashboard/${page.id}`);
+      // Reset the edited flag for the new page
+      this.hasContentBeenEdited = false;
+    });
 
-      // Clear editor instance to force recreation
-      if (editorStore.editor) {
-        editorStore.editor = null;
-      }
+    // Invalidate related queries
+    this.queryClient.invalidateQueries({
+      queryKey: ["page", page.id],
     });
   }
 
@@ -616,6 +616,9 @@ export class PageStore {
           this.selectedPage = res.data;
         }
         this.error = null;
+
+        // Mark that content has been edited
+        this.hasContentBeenEdited = true;
       });
 
       // Mark that user is typing and reset typing timeout
@@ -654,6 +657,19 @@ export class PageStore {
 
   // Handle editor blur - start auto-tag generation process
   handleEditorBlur(pageId: string, workspaceId: string): void {
+    // Only proceed if content has been edited
+    if (!this.hasContentBeenEdited) {
+      console.log("🏷️ Auto-tag generation skipped: No content has been edited");
+      return;
+    }
+
+    console.log(
+      "✅ Content has been edited, proceeding with auto-tag generation"
+    );
+
+    // Reset the edited flag since we're processing the changes
+    this.hasContentBeenEdited = false;
+
     // Clear any existing auto-tag timeout
     if (this.autoTagTimeout) {
       clearTimeout(this.autoTagTimeout);

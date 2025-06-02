@@ -350,6 +350,7 @@ const BlockNoteEditorComponent = () => {
         console.error("Error inserting link:", error);
       }
     },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     [editor, aiLinkStore]
   );
 
