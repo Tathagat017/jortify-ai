@@ -1,5 +1,13 @@
 import React, { useState } from "react";
-import { Modal, Stack, Button, Text, Loader, Alert } from "@mantine/core";
+import {
+  Modal,
+  Stack,
+  Button,
+  Text,
+  Loader,
+  Alert,
+  useMantineTheme,
+} from "@mantine/core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   faLightbulb,
@@ -8,6 +16,7 @@ import {
   faFileText,
   faTimes,
   faCheck,
+  faWandMagicSparkles,
 } from "@fortawesome/free-solid-svg-icons";
 import { aiService } from "../../../services/ai.service";
 import { useStore } from "../../../hooks/use-store";
@@ -38,33 +47,70 @@ interface Block {
   content?: BlockContent[] | string;
 }
 
+interface AnalysisSuggestion {
+  type: "grammar" | "style" | "clarity" | "tone";
+  message: string;
+  severity: "low" | "medium" | "high";
+  startIndex?: number;
+  endIndex?: number;
+}
+
+interface AnalysisResult {
+  suggestions: AnalysisSuggestion[];
+  score: number;
+}
+
 const AI_OPERATIONS: AIOperation[] = [
   {
     type: "complete",
     title: "Complete Text",
     description: "AI will complete your current text",
-    icon: <FontAwesomeIcon icon={faPencil} size="sm" />,
-    color: "gray",
-  },
-  {
-    type: "suggestions",
-    title: "Improvement Suggestions",
-    description: "Get AI suggestions for improving content",
-    icon: <FontAwesomeIcon icon={faLightbulb} size="sm" />,
+    icon: (
+      <FontAwesomeIcon
+        icon={faPencil}
+        size="sm"
+        style={{ color: "#3b82f6", width: "14px", textAlign: "left" }}
+      />
+    ),
     color: "gray",
   },
   {
     type: "analyze",
     title: "Writing Analysis",
     description: "Analyze writing quality and get feedback",
-    icon: <FontAwesomeIcon icon={faChartLine} size="sm" />,
+    icon: (
+      <FontAwesomeIcon
+        icon={faChartLine}
+        size="sm"
+        style={{ color: "#10b981", width: "14px", textAlign: "left" }}
+      />
+    ),
+    color: "gray",
+  },
+  {
+    type: "suggestions",
+    title: "Improvement Suggestions",
+    description: "Get AI suggestions for improving content",
+    icon: (
+      <FontAwesomeIcon
+        icon={faLightbulb}
+        size="sm"
+        style={{ color: "#f59e0b", width: "14px", textAlign: "left" }}
+      />
+    ),
     color: "gray",
   },
   {
     type: "summarize",
     title: "Summarize Content",
     description: "Generate a summary of your content",
-    icon: <FontAwesomeIcon icon={faFileText} size="sm" />,
+    icon: (
+      <FontAwesomeIcon
+        icon={faFileText}
+        size="sm"
+        style={{ color: "#8b5cf6", width: "14px", textAlign: "left" }}
+      />
+    ),
     color: "gray",
   },
 ];
@@ -80,7 +126,7 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
     useState<AIOperationType | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-
+  const theme = useMantineTheme();
   const getCurrentContent = () => {
     if (!pageStore.selectedPage?.content) return "";
 
@@ -111,6 +157,33 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
       console.error("Error extracting content:", error);
       return "";
     }
+  };
+
+  const formatAnalysisResult = (analysis: AnalysisResult) => {
+    const score = analysis.score || 0;
+    const suggestions = analysis.suggestions || [];
+
+    let formattedResult = `Writing Quality Score: ${score}/100\n\nSuggestions:\n`;
+
+    suggestions.forEach((suggestion: AnalysisSuggestion) => {
+      const icon =
+        suggestion.type === "tone"
+          ? "🔊"
+          : suggestion.type === "clarity"
+          ? "👁️"
+          : suggestion.type === "style"
+          ? "✨"
+          : suggestion.type === "grammar"
+          ? "📝"
+          : "💡";
+
+      const priority = suggestion.severity || "medium";
+      formattedResult += `${icon} [${suggestion.type.toUpperCase()}] ${
+        suggestion.message
+      } (${priority} priority)\n`;
+    });
+
+    return formattedResult;
   };
 
   const handleOperationClick = async (operation: AIOperationType) => {
@@ -166,16 +239,7 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
               }
               case "analyze": {
                 const analysis = await aiService.analyzeWriting(summaryContent);
-                response = `Writing Quality Score: ${
-                  analysis.score
-                }/100\n\nSuggestions:\n${analysis.suggestions
-                  .map(
-                    (s) =>
-                      `• [${s.type.toUpperCase()}] ${s.message} (${
-                        s.severity
-                      } priority)`
-                  )
-                  .join("\n")}`;
+                response = formatAnalysisResult(analysis);
                 break;
               }
               default:
@@ -211,16 +275,7 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
         }
         case "analyze": {
           const analysis = await aiService.analyzeWriting(content);
-          response = `Writing Quality Score: ${
-            analysis.score
-          }/100\n\nSuggestions:\n${analysis.suggestions
-            .map(
-              (s) =>
-                `• [${s.type.toUpperCase()}] ${s.message} (${
-                  s.severity
-                } priority)`
-            )
-            .join("\n")}`;
+          response = formatAnalysisResult(analysis);
           break;
         }
         case "summarize": {
@@ -263,18 +318,35 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
     onClose();
   };
 
+  const getCurrentOperationIcon = () => {
+    const operation = AI_OPERATIONS.find((op) => op.type === currentOperation);
+    return operation?.icon || null;
+  };
+
   return (
     <Modal
       opened={isOpen}
       onClose={handleClose}
-      title="AI Assistant"
+      title={
+        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+          <FontAwesomeIcon
+            icon={faWandMagicSparkles}
+            size="sm"
+            style={{ color: theme.colors.indigo[5] }}
+          />
+          {result && getCurrentOperationIcon()}
+          <Text weight={600} color="dark" size="md">
+            {result ? `AI ${currentOperation} Result` : "AI Assistant"}
+          </Text>
+        </div>
+      }
       size="sm"
       centered
     >
       <Stack spacing="sm">
         {!loading && !result && !error && (
           <>
-            <Text size="sm" color="dimmed">
+            <Text size="sm" color="dark" style={{ marginBottom: "8px" }}>
               Choose an AI operation to help with your content:
             </Text>
 
@@ -284,25 +356,55 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
                 variant="light"
                 color={operation.color}
                 onClick={() => handleOperationClick(operation.type)}
+                styles={{
+                  inner: {
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "flex-start",
+                  },
+                }}
                 style={{
                   height: "auto",
-                  padding: "10px 14px",
+                  padding: "12px 16px",
+                  justifyContent: "flex-start",
                 }}
               >
                 <div
                   style={{
                     display: "flex",
-                    alignItems: "center",
-                    gap: "10px",
+                    alignItems: "flex-start",
+                    gap: "12px",
                     width: "100%",
+                    textAlign: "left",
                   }}
                 >
-                  {operation.icon}
-                  <div style={{ textAlign: "left", flex: 1 }}>
-                    <Text weight={500} size="sm">
+                  <div
+                    style={{
+                      width: "30px",
+                      height: "20px",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "flex-start",
+                      flexShrink: 0,
+                      marginTop: "2px",
+                    }}
+                  >
+                    {operation.icon}
+                  </div>
+                  <div style={{ textAlign: "left", flex: 1, minWidth: 0 }}>
+                    <Text
+                      weight={500}
+                      size="sm"
+                      color="dark"
+                      style={{ lineHeight: 1.3 }}
+                    >
                       {operation.title}
                     </Text>
-                    <Text size="xs" color="dimmed">
+                    <Text
+                      size="xs"
+                      color="dimmed"
+                      style={{ lineHeight: 1.3, marginTop: "2px" }}
+                    >
                       {operation.description}
                     </Text>
                   </div>
@@ -329,7 +431,7 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
 
         {result && (
           <>
-            <Alert color="gray" title={`AI ${currentOperation} Result`}>
+            <Alert color="gray">
               <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
                 {result}
               </Text>
@@ -344,25 +446,44 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
             >
               {/* Analysis only needs OK button */}
               {currentOperation === "analyze" ? (
-                <Button variant="filled" color="gray" onClick={handleClose}>
+                <Button
+                  variant="filled"
+                  color="dark"
+                  onClick={handleClose}
+                  style={{ backgroundColor: "#495057" }}
+                >
                   OK
                 </Button>
               ) : currentOperation === "suggestions" ? (
                 /* Improvement suggestions only need OK button */
-                <Button variant="filled" color="gray" onClick={handleClose}>
+                <Button
+                  variant="filled"
+                  color="dark"
+                  onClick={handleClose}
+                  style={{ backgroundColor: "#495057" }}
+                >
                   OK
                 </Button>
               ) : (
                 /* Complete and Summarize need Accept/Reject */
                 <>
-                  <Button variant="outline" color="gray" onClick={handleClose}>
+                  <Button
+                    variant="outline"
+                    color="dark"
+                    onClick={handleClose}
+                    style={{ borderColor: "#495057", color: "#495057" }}
+                  >
                     <FontAwesomeIcon
                       icon={faTimes}
                       style={{ marginRight: "8px" }}
                     />
                     Reject
                   </Button>
-                  <Button color="gray" onClick={handleAccept}>
+                  <Button
+                    color="dark"
+                    onClick={handleAccept}
+                    style={{ backgroundColor: "#495057" }}
+                  >
                     <FontAwesomeIcon
                       icon={faCheck}
                       style={{ marginRight: "8px" }}
