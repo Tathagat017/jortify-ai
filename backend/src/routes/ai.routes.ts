@@ -84,6 +84,12 @@ router.post("/complete", asyncHandler(AIController.completeText));
 // Analyze writing quality
 router.post("/analyze", asyncHandler(AIController.analyzeWriting));
 
+// Generate content based on suggestion and block context
+router.post(
+  "/suggestion-generate",
+  asyncHandler(AIController.generateContentFromSuggestion)
+);
+
 // =================== RAG CHATBOT ENDPOINTS ===================
 
 // Create a new chat conversation

@@ -708,4 +708,106 @@ Respond with JSON only:
       throw new Error("Failed to analyze writing");
     }
   }
+
+  /**
+   * Generate content based on suggestions and block context
+   */
+  static async generateContentFromSuggestion(
+    suggestion: string,
+    blockContext: string,
+    workspaceId: string,
+    pageId?: string
+  ): Promise<string> {
+    if (!process.env.OPENAI_API_KEY) {
+      throw new Error("OpenAI API key not configured");
+    }
+
+    try {
+      // Get workspace context for better content generation
+      const { data: recentPages } = await supabase
+        .from("pages")
+        .select("title, content")
+        .eq("workspace_id", workspaceId)
+        .order("updated_at", { ascending: false })
+        .limit(3);
+
+      const workspaceContext =
+        recentPages
+          ?.map(
+            (p) => `${p.title}: ${JSON.stringify(p.content).slice(0, 200)}...`
+          )
+          .join("\n") || "";
+
+      // Get current page context if pageId is provided
+      let currentPageContext = "";
+      if (pageId) {
+        const { data: currentPage } = await supabase
+          .from("pages")
+          .select("title, content")
+          .eq("id", pageId)
+          .single();
+
+        if (currentPage) {
+          currentPageContext = `Current page: ${
+            currentPage.title
+          }\n${JSON.stringify(currentPage.content).slice(0, 500)}...`;
+        }
+      }
+
+      const prompt = `
+You are an AI content generator for a Notion-like workspace. Your task is to generate new content based on a suggestion and the existing block context.
+
+IMPORTANT INSTRUCTIONS:
+1. DO NOT LOSE ANY EXISTING DATA from the block context
+2. ENHANCE and EXPAND the existing content based on the suggestion
+3. Maintain the original structure and flow
+4. Add new relevant information that complements the existing content
+5. Keep the tone and style consistent with the existing content
+
+Workspace context (recent pages):
+${workspaceContext}
+
+${currentPageContext}
+
+Current block context (PRESERVE ALL THIS DATA):
+"${blockContext}"
+
+Suggestion to implement:
+"${suggestion}"
+
+Generate enhanced content that:
+- Keeps all existing information intact
+- Incorporates the suggestion naturally
+- Adds valuable new content based on the suggestion
+- Maintains logical flow and structure
+- Expands on the existing ideas
+
+Return only the enhanced content as plain text, ready to replace the current block content.
+`;
+
+      const response = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are a helpful content generator. Generate enhanced content that preserves existing information while implementing the given suggestion. Return only the enhanced content as plain text.",
+          },
+          { role: "user", content: prompt },
+        ],
+        max_tokens: 800,
+        temperature: 0.7,
+      });
+
+      const generatedContent = response.choices[0]?.message?.content;
+      if (!generatedContent) {
+        throw new Error("No response from AI");
+      }
+
+      return generatedContent.trim();
+    } catch (error) {
+      console.error("Error generating content from suggestion:", error);
+      throw new Error("Failed to generate content from suggestion");
+    }
+  }
 }

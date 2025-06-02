@@ -368,6 +368,28 @@ class AIService {
 
     return response;
   }
+
+  async generateContentFromSuggestion(
+    suggestion: string,
+    blockContext: string,
+    workspaceId: string,
+    pageId?: string
+  ): Promise<string> {
+    const response = await this.makeRequest<{
+      generatedContent: string;
+      originalSuggestion: string;
+    }>("/ai/suggestion-generate", {
+      method: "POST",
+      body: JSON.stringify({
+        suggestion,
+        blockContext,
+        workspaceId,
+        pageId,
+      }),
+    });
+
+    return response.generatedContent;
+  }
 }
 
 export const aiService = new AIService();

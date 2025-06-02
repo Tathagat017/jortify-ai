@@ -17,6 +17,8 @@ import {
   faTimes,
   faCheck,
   faWandMagicSparkles,
+  faMagic,
+  faArrowLeft,
 } from "@fortawesome/free-solid-svg-icons";
 import { aiService } from "../../../services/ai.service";
 import { useStore } from "../../../hooks/use-store";
@@ -126,6 +128,8 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
     useState<AIOperationType | null>(null);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [generatedContent, setGeneratedContent] = useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = useState(false);
   const theme = useMantineTheme();
   const getCurrentContent = () => {
     if (!pageStore.selectedPage?.content) return "";
@@ -310,12 +314,65 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
     }
   };
 
+  const handleAcceptGenerated = () => {
+    if (generatedContent) {
+      onSuggestionAccept(generatedContent);
+      handleClose();
+    }
+  };
+
+  const handleGenerateContent = async () => {
+    if (
+      !workspaceStore.selectedWorkspace ||
+      !pageStore.selectedPage ||
+      !result
+    ) {
+      setError("Missing required data for content generation");
+      return;
+    }
+
+    setIsGenerating(true);
+    setError(null);
+
+    try {
+      const content = getCurrentContent();
+      const firstSuggestion = result.split("\n\n")[0]; // Use first suggestion from the result
+
+      const generated = await aiService.generateContentFromSuggestion(
+        firstSuggestion,
+        content,
+        workspaceStore.selectedWorkspace.id,
+        pageStore.selectedPage.id
+      );
+
+      setGeneratedContent(generated);
+    } catch (error) {
+      console.error("Content generation failed:", error);
+      setError(
+        error instanceof Error ? error.message : "Content generation failed"
+      );
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleClose = () => {
     setLoading(false);
     setCurrentOperation(null);
     setResult(null);
     setError(null);
+    setGeneratedContent(null);
+    setIsGenerating(false);
     onClose();
+  };
+
+  const handleBack = () => {
+    setLoading(false);
+    setCurrentOperation(null);
+    setResult(null);
+    setError(null);
+    setGeneratedContent(null);
+    setIsGenerating(false);
   };
 
   const getCurrentOperationIcon = () => {
@@ -329,14 +386,33 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
       onClose={handleClose}
       title={
         <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-          <FontAwesomeIcon
-            icon={faWandMagicSparkles}
-            size="sm"
-            style={{ color: theme.colors.indigo[5] }}
-          />
+          {result || generatedContent || loading ? (
+            <Button
+              variant="subtle"
+              size="xs"
+              onClick={handleBack}
+              style={{ padding: "4px", minWidth: "auto" }}
+            >
+              <FontAwesomeIcon
+                icon={faArrowLeft}
+                size="sm"
+                style={{ color: theme.colors.indigo[5] }}
+              />
+            </Button>
+          ) : (
+            <FontAwesomeIcon
+              icon={faWandMagicSparkles}
+              size="sm"
+              style={{ color: theme.colors.indigo[5] }}
+            />
+          )}
           {result && getCurrentOperationIcon()}
           <Text weight={600} color="dark" size="md">
-            {result ? `AI ${currentOperation} Result` : "AI Assistant"}
+            {result
+              ? `AI ${currentOperation} Result`
+              : generatedContent
+              ? "Generated Content"
+              : "AI Assistant"}
           </Text>
         </div>
       }
@@ -429,9 +505,32 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
           </Alert>
         )}
 
-        {result && (
+        {result && !generatedContent && (
           <>
-            <Alert color="gray">
+            <Alert
+              color={
+                currentOperation === "analyze"
+                  ? "blue"
+                  : currentOperation === "suggestions"
+                  ? "yellow"
+                  : currentOperation === "complete"
+                  ? "indigo"
+                  : currentOperation === "summarize"
+                  ? "violet"
+                  : "gray"
+              }
+              title={
+                currentOperation === "analyze"
+                  ? "Writing Analysis"
+                  : currentOperation === "suggestions"
+                  ? "AI Suggestions"
+                  : currentOperation === "complete"
+                  ? "Text Completion"
+                  : currentOperation === "summarize"
+                  ? "Content Summary"
+                  : "AI Result"
+              }
+            >
               <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
                 {result}
               </Text>
@@ -455,15 +554,30 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
                   OK
                 </Button>
               ) : currentOperation === "suggestions" ? (
-                /* Improvement suggestions only need OK button */
-                <Button
-                  variant="filled"
-                  color="dark"
-                  onClick={handleClose}
-                  style={{ backgroundColor: "#495057" }}
-                >
-                  OK
-                </Button>
+                /* Improvement suggestions show Cancel and Generate Content buttons */
+                <>
+                  <Button
+                    variant="outline"
+                    color="dark"
+                    onClick={handleClose}
+                    style={{ borderColor: "#495057", color: "#495057" }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    variant="filled"
+                    color="dark"
+                    onClick={handleGenerateContent}
+                    loading={isGenerating}
+                    style={{ backgroundColor: "#495057" }}
+                  >
+                    <FontAwesomeIcon
+                      icon={faMagic}
+                      style={{ marginRight: "8px" }}
+                    />
+                    Generate Content
+                  </Button>
+                </>
               ) : (
                 /* Complete and Summarize need Accept/Reject */
                 <>
@@ -492,6 +606,48 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
                   </Button>
                 </>
               )}
+            </div>
+          </>
+        )}
+
+        {generatedContent && (
+          <>
+            <Alert color="green" title="Generated Content">
+              <Text size="sm" style={{ whiteSpace: "pre-wrap" }}>
+                {generatedContent}
+              </Text>
+            </Alert>
+
+            <div
+              style={{
+                display: "flex",
+                gap: "8px",
+                justifyContent: "flex-end",
+              }}
+            >
+              <Button
+                variant="outline"
+                color="dark"
+                onClick={handleClose}
+                style={{ borderColor: "#495057", color: "#495057" }}
+              >
+                <FontAwesomeIcon
+                  icon={faTimes}
+                  style={{ marginRight: "8px" }}
+                />
+                Cancel
+              </Button>
+              <Button
+                color="dark"
+                onClick={handleAcceptGenerated}
+                style={{ backgroundColor: "#495057" }}
+              >
+                <FontAwesomeIcon
+                  icon={faCheck}
+                  style={{ marginRight: "8px" }}
+                />
+                Accept & Insert
+              </Button>
             </div>
           </>
         )}

@@ -51,6 +51,13 @@ const createConversationSchema = Joi.object({
   title: Joi.string().optional().default("New Chat"),
 });
 
+const generateContentSchema = Joi.object({
+  suggestion: Joi.string().required().min(5),
+  blockContext: Joi.string().required().min(10),
+  workspaceId: Joi.string().uuid().required(),
+  pageId: Joi.string().uuid().optional(),
+});
+
 export class AIController {
   // Real-time AI suggestions for in-editor assistance
   static async generateSuggestions(req: Request, res: Response) {
@@ -259,6 +266,48 @@ export class AIController {
       success: true,
       analysis,
       textLength: text.length,
+      timestamp: new Date().toISOString(),
+    });
+  }
+
+  // Generate content based on suggestion and block context
+  static async generateContentFromSuggestion(req: Request, res: Response) {
+    const { error: validationError, value } = generateContentSchema.validate(
+      req.body
+    );
+    if (validationError) {
+      throw new AppError(
+        400,
+        `Validation error: ${validationError.details[0].message}`
+      );
+    }
+
+    const { suggestion, blockContext, workspaceId, pageId } = value;
+
+    const generatedContent = await AIService.generateContentFromSuggestion(
+      suggestion,
+      blockContext,
+      workspaceId,
+      pageId
+    );
+
+    // Log AI interaction
+    try {
+      await supabase.from("ai_sessions").insert({
+        workspace_id: workspaceId,
+        session_type: "content_generation",
+        input_data: { suggestion, blockContext: blockContext.slice(0, 200) },
+        output_data: { generatedContent: generatedContent.slice(0, 500) },
+        metadata: { pageId, contentLength: generatedContent.length },
+      });
+    } catch (logError) {
+      console.warn("Failed to log AI interaction:", logError);
+    }
+
+    res.json({
+      success: true,
+      generatedContent,
+      originalSuggestion: suggestion,
       timestamp: new Date().toISOString(),
     });
   }
