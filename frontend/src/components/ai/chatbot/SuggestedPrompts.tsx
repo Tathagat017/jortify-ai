@@ -1,7 +1,7 @@
 import React from "react";
 import { Box, Text, Button, Stack, Center, Loader } from "@mantine/core";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faLightbulb, faRocket } from "@fortawesome/free-solid-svg-icons";
+import { faLightbulb, faRobot } from "@fortawesome/free-solid-svg-icons";
 
 interface SuggestedPromptsProps {
   prompts: string[];
@@ -30,11 +30,7 @@ const SuggestedPrompts: React.FC<SuggestedPromptsProps> = ({
             border: "2px solid #000",
           }}
         >
-          <FontAwesomeIcon
-            icon={faRocket}
-            size="2x"
-            style={{ color: "#fff" }}
-          />
+          <FontAwesomeIcon icon={faRobot} size="2x" style={{ color: "#fff" }} />
         </Box>
       </Center>
 

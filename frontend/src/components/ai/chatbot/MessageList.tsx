@@ -24,7 +24,14 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isTyping }) => {
   return (
     <Box>
       {messages.map((message) => (
-        <Box key={message.id} mb="md">
+        <Box
+          key={message.id}
+          mb="md"
+          p="sm"
+          style={{
+            borderRadius: "8px",
+          }}
+        >
           <Group spacing="sm" align="flex-start">
             {/* Avatar */}
             <Box
@@ -32,12 +39,16 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isTyping }) => {
                 width: "32px",
                 height: "32px",
                 borderRadius: "50%",
-                backgroundColor: message.role === "user" ? "#000" : "#666",
+                backgroundColor:
+                  message.role === "user" ? "#4A90E2" : "#28A745",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                border: "1px solid #000",
+                border: `2px solid ${
+                  message.role === "user" ? "#357ABD" : "#1E7E34"
+                }`,
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               }}
             >
               <FontAwesomeIcon
@@ -48,7 +59,7 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isTyping }) => {
             </Box>
 
             {/* Message Content */}
-            <Box style={{ flex: 1, minWidth: 0 }}>
+            <Box style={{ flex: 1 }}>
               <Group spacing="xs" mb="xs">
                 <Text size="sm" weight={500} style={{ color: "#000" }}>
                   {message.role === "user" ? "You" : "AI Assistant"}
@@ -61,9 +72,13 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isTyping }) => {
               <Paper
                 p="sm"
                 style={{
-                  backgroundColor: message.role === "user" ? "#f8f9fa" : "#fff",
-                  border: `1px solid #ddd`,
+                  backgroundColor:
+                    message.role === "user" ? "#f0f8ff" : "#f8fff8",
+                  border: `1px solid ${
+                    message.role === "user" ? "#e6f3ff" : "#e8ffe8"
+                  }`,
                   color: "#000",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                 }}
               >
                 <Text
@@ -124,19 +139,26 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isTyping }) => {
 
       {/* Typing Indicator */}
       {isTyping && (
-        <Box mb="md">
+        <Box
+          mb="md"
+          p="sm"
+          style={{
+            borderRadius: "8px",
+          }}
+        >
           <Group spacing="sm" align="flex-start">
             <Box
               style={{
                 width: "32px",
                 height: "32px",
                 borderRadius: "50%",
-                backgroundColor: "#666",
+                backgroundColor: "#28A745",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                border: "1px solid #000",
+                border: "2px solid #1E7E34",
+                boxShadow: "0 2px 4px rgba(0,0,0,0.1)",
               }}
             >
               <FontAwesomeIcon
@@ -159,8 +181,9 @@ const MessageList: React.FC<MessageListProps> = ({ messages, isTyping }) => {
               <Paper
                 p="sm"
                 style={{
-                  backgroundColor: "#fff",
-                  border: "1px solid #ddd",
+                  backgroundColor: "#f8fff8",
+                  border: "1px solid #e8ffe8",
+                  boxShadow: "0 1px 3px rgba(0,0,0,0.05)",
                 }}
               >
                 <Group spacing="xs">

@@ -8,6 +8,7 @@ import {
   faFile,
   faPlus,
   faSearch,
+  faTimes,
   faTrash,
   faTrashRestore,
 } from "@fortawesome/free-solid-svg-icons";
@@ -15,7 +16,10 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   ActionIcon,
   Box,
+  Button,
+  Group,
   Menu,
+  Popover,
   ScrollArea,
   Text,
   TextInput,
@@ -60,8 +64,14 @@ const PageTreeItem: React.FC<PageTreeItemProps> = observer(
     maxLevel = 1,
   }) => {
     const [isExpanded, setIsExpanded] = useState(false);
+    const [deletePopoverOpen, setDeletePopoverOpen] = useState(false);
     const hasChildren = page.children && page.children.length > 0;
     const canExpand = level < maxLevel && hasChildren;
+
+    const handleDeleteConfirm = () => {
+      onDeletePage(page.id);
+      setDeletePopoverOpen(false);
+    };
 
     return (
       <Box>
@@ -179,14 +189,6 @@ const PageTreeItem: React.FC<PageTreeItemProps> = observer(
               >
                 Move to...
               </Menu.Item>
-              <Menu.Divider />
-              <Menu.Item
-                icon={<FontAwesomeIcon icon={faTrash} size="sm" />}
-                onClick={() => onDeletePage(page.id)}
-                color="red"
-              >
-                Delete
-              </Menu.Item>
             </Menu.Dropdown>
           </Menu>
 
@@ -210,6 +212,58 @@ const PageTreeItem: React.FC<PageTreeItemProps> = observer(
               <FontAwesomeIcon icon={faPlus} size="xs" />
             </ActionIcon>
           )}
+          {/* Delete Button with Confirmation Popover */}
+          <Popover
+            opened={deletePopoverOpen}
+            onClose={() => setDeletePopoverOpen(false)}
+            position="bottom"
+            withArrow
+            shadow="md"
+            width={280}
+          >
+            <Popover.Target>
+              <ActionIcon
+                size="xs"
+                variant="subtle"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setDeletePopoverOpen(true);
+                }}
+                style={{
+                  opacity: 0,
+                  color: "#dc3545",
+                  transition: "opacity 0.15s ease",
+                }}
+                title="Delete page"
+                className="page-options-btn"
+              >
+                <FontAwesomeIcon icon={faTimes} size="xs" />
+              </ActionIcon>
+            </Popover.Target>
+            <Popover.Dropdown>
+              <Box p="sm">
+                <Text size="sm" weight={500} mb="xs">
+                  Move to trash?
+                </Text>
+                <Text size="xs" color="dimmed" mb="md">
+                  This page will be moved to trash. You can restore it later if
+                  needed.
+                </Text>
+                <Group spacing="xs">
+                  <Button size="xs" color="red" onClick={handleDeleteConfirm}>
+                    Move to trash
+                  </Button>
+                  <Button
+                    size="xs"
+                    variant="subtle"
+                    onClick={() => setDeletePopoverOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </Group>
+              </Box>
+            </Popover.Dropdown>
+          </Popover>
         </Box>
 
         {/* Children - only show if level allows */}
@@ -393,9 +447,7 @@ const Sidebar: React.FC<SidebarProps> = observer(({ isOpen }) => {
   };
 
   const handleDeletePage = (pageId: string) => {
-    if (confirm("Move this page to trash?")) {
-      deletePageMutation.mutate(pageId);
-    }
+    deletePageMutation.mutate(pageId);
   };
 
   const handleRestorePage = (pageId: string) => {

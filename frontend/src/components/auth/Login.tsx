@@ -3,6 +3,7 @@ import {
   faGoogle,
   faLinkedin,
 } from "@fortawesome/free-brands-svg-icons";
+import { faCheckCircle } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import {
   Box,
@@ -13,6 +14,7 @@ import {
   Text,
   TextInput,
 } from "@mantine/core";
+import { notifications } from "@mantine/notifications";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
@@ -30,6 +32,16 @@ export const Login = observer(() => {
     const success = await authStore.signIn(email, password);
     if (success) {
       if (authStore.user) {
+        // Show success notification
+        notifications.show({
+          id: "login-success",
+          title: "Welcome back!",
+          message: "You have been successfully logged in.",
+          color: "green",
+          icon: <FontAwesomeIcon icon={faCheckCircle} />,
+          autoClose: 3000,
+        });
+
         // Get the intended destination from location state, default to dashboard
         const from =
           (location.state as { from?: { pathname: string } })?.from?.pathname ||
@@ -79,6 +91,7 @@ export const Login = observer(() => {
         value={email}
         onChange={(e) => setEmail(e.target.value)}
         mb={16}
+        disabled={authStore.loading}
       />
       <PasswordInput
         label="Password"
@@ -87,8 +100,17 @@ export const Login = observer(() => {
         value={password}
         onChange={(e) => setPassword(e.target.value)}
         mb={16}
+        disabled={authStore.loading}
       />
-      <Button fullWidth onClick={handleSubmit} mt={8} mb={8} color="dark">
+      <Button
+        fullWidth
+        onClick={handleSubmit}
+        mt={8}
+        mb={8}
+        color="dark"
+        loading={authStore.loading}
+        disabled={authStore.loading}
+      >
         Continue
       </Button>
 
@@ -100,6 +122,7 @@ export const Login = observer(() => {
           color="dark"
           onClick={() => uiStore.openAuthModal("signup")}
           style={{ padding: 0, height: "auto", marginBottom: 4 }}
+          disabled={authStore.loading}
         >
           Sign up
         </Button>

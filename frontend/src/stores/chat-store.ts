@@ -17,10 +17,8 @@ export class ChatStore {
 
   // Suggested prompts for new conversations
   suggestedPrompts = [
-    "Summarize the key points from my recent pages",
     "What are the main themes in my workspace?",
     "Help me find pages related to a specific topic",
-    "What questions can I ask about my content?",
   ];
 
   constructor(queryClient: QueryClient) {
