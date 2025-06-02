@@ -293,6 +293,36 @@ const BlockNoteEditorComponent = () => {
     handleLinkTrigger,
   ]);
 
+  // Add blur/focus listeners for auto-tag generation
+  useEffect(() => {
+    const editorElement = document.querySelector(".bn-editor");
+    if (editorElement) {
+      const handleBlur = () => {
+        if (!pageStore.selectedPage || !workspaceStore.selectedWorkspace)
+          return;
+
+        // Trigger auto-tag generation with debouncing
+        pageStore.handleEditorBlur(
+          pageStore.selectedPage.id,
+          workspaceStore.selectedWorkspace.id
+        );
+      };
+
+      const handleFocus = () => {
+        // Cancel any pending auto-tag generation when user starts editing again
+        pageStore.cancelAutoTagGeneration();
+      };
+
+      editorElement.addEventListener("blur", handleBlur, true);
+      editorElement.addEventListener("focus", handleFocus, true);
+
+      return () => {
+        editorElement.removeEventListener("blur", handleBlur, true);
+        editorElement.removeEventListener("focus", handleFocus, true);
+      };
+    }
+  }, [pageStore, workspaceStore]);
+
   // Handle link acceptance
   const handleLinkAccept = useCallback(
     (

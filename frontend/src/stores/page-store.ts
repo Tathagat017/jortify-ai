@@ -65,6 +65,9 @@ export class PageStore {
   error: string | null = null;
   private baseUrl: string =
     import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
+  private autoTagTimeout: NodeJS.Timeout | null = null;
+  private typingTimeout: NodeJS.Timeout | null = null;
+  private isUserTyping: boolean = false;
 
   constructor(queryClient: QueryClient) {
     makeAutoObservable(this);
@@ -592,15 +595,180 @@ export class PageStore {
   async updatePageContent(
     pageId: string,
     content: PartialBlock[]
-  ): Promise<boolean> {
+  ): Promise<void> {
+    const token = localStorage.getItem("jortify_token");
+    if (!token) return;
+
     try {
-      // Process any blob URLs in the content before saving
-      const processedContent = await this.processContentImages(content, pageId);
-      await this.updatePage(pageId, { content: processedContent });
-      return true;
+      this.loading = true;
+      const res: AxiosResponse<Page> = await axios.put(
+        `${this.baseUrl}/api/pages/${pageId}`,
+        { content },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        }
+      );
+
+      runInAction(() => {
+        const index = this.pages.findIndex((page) => page.id === pageId);
+        if (index !== -1) {
+          this.pages[index] = res.data;
+        }
+        if (this.selectedPage?.id === pageId) {
+          this.selectedPage = res.data;
+        }
+        this.error = null;
+      });
+
+      // Mark that user is typing and reset typing timeout
+      this.handleUserTyping();
     } catch (error) {
-      console.error("Error updating page content:", error);
-      return false;
+      runInAction(() => {
+        this.error = "Failed to update page content";
+        console.error("Error updating page content:", error);
+      });
+    } finally {
+      runInAction(() => {
+        this.loading = false;
+      });
+    }
+  }
+
+  // Handle user typing - reset timers
+  handleUserTyping(): void {
+    this.isUserTyping = true;
+
+    // Clear existing typing timeout
+    if (this.typingTimeout) {
+      clearTimeout(this.typingTimeout);
+    }
+
+    // Clear existing auto-tag timeout
+    if (this.autoTagTimeout) {
+      clearTimeout(this.autoTagTimeout);
+    }
+
+    // Set new typing timeout (user stops typing after 2 seconds)
+    this.typingTimeout = setTimeout(() => {
+      this.isUserTyping = false;
+    }, 2000);
+  }
+
+  // Handle editor blur - start auto-tag generation process
+  handleEditorBlur(pageId: string, workspaceId: string): void {
+    // Clear any existing auto-tag timeout
+    if (this.autoTagTimeout) {
+      clearTimeout(this.autoTagTimeout);
+    }
+
+    // Only proceed if user is not currently typing
+    if (!this.isUserTyping) {
+      this.startAutoTagGeneration(pageId, workspaceId);
+    } else {
+      // Wait for typing to finish, then start auto-tag generation
+      const checkTypingInterval = setInterval(() => {
+        if (!this.isUserTyping) {
+          clearInterval(checkTypingInterval);
+          this.startAutoTagGeneration(pageId, workspaceId);
+        }
+      }, 500);
+
+      // Safety timeout - don't wait forever
+      setTimeout(() => {
+        clearInterval(checkTypingInterval);
+        if (!this.isUserTyping) {
+          this.startAutoTagGeneration(pageId, workspaceId);
+        }
+      }, 10000); // Max 10 seconds wait
+    }
+  }
+
+  // Start the 30-second countdown for auto-tag generation
+  private startAutoTagGeneration(pageId: string, workspaceId: string): void {
+    // Import tagStore dynamically and start loading state
+    import("./store-context-provider").then(({ store }) => {
+      const { tagStore } = store;
+      if (tagStore) {
+        tagStore.startAutoGeneration();
+      }
+    });
+
+    this.autoTagTimeout = setTimeout(async () => {
+      await this.generateAutoTags(pageId, workspaceId);
+    }, 15000); // Changed to 15 seconds
+  }
+
+  // Generate auto tags for a page
+  private async generateAutoTags(
+    pageId: string,
+    workspaceId: string
+  ): Promise<void> {
+    try {
+      const page = this.pages.find((p) => p.id === pageId);
+      if (!page) return;
+
+      // Check if page has meaningful content
+      const contentText = this.extractTextFromContent(page.content);
+      if (!contentText || contentText.trim().length < 50) {
+        return; // Don't generate tags for pages with minimal content
+      }
+
+      // Import tagStore dynamically to avoid circular dependency
+      const { store } = await import("./store-context-provider");
+      const { tagStore } = store;
+
+      if (tagStore) {
+        await tagStore.generateTagsForPage(
+          page.title,
+          page.content || {},
+          workspaceId,
+          pageId, // Pass pageId for duplicate checking
+          true // Mark as auto-generation
+        );
+      }
+    } catch (error) {
+      console.error("Error generating auto tags:", error);
+    }
+  }
+
+  // Cancel auto-tag generation (e.g., when user starts typing again)
+  cancelAutoTagGeneration(): void {
+    if (this.autoTagTimeout) {
+      clearTimeout(this.autoTagTimeout);
+      this.autoTagTimeout = null;
+    }
+
+    // Stop the loading state in tag store
+    import("./store-context-provider").then(({ store }) => {
+      const { tagStore } = store;
+      if (tagStore) {
+        tagStore.stopAutoGeneration();
+      }
+    });
+  }
+
+  // Extract text content from BlockNote content for analysis
+  private extractTextFromContent(content: PartialBlock[] | undefined): string {
+    if (!content || !Array.isArray(content)) return "";
+
+    try {
+      // Simple JSON stringify approach to extract text
+      const contentStr = JSON.stringify(content);
+      // Extract text values from the JSON string
+      const textMatches = contentStr.match(/"text":"([^"]+)"/g);
+      if (textMatches) {
+        return textMatches
+          .map((match) => match.replace(/"text":"([^"]+)"/, "$1"))
+          .join(" ")
+          .trim();
+      }
+      return "";
+    } catch (error) {
+      console.error("Error extracting text from content:", error);
+      return "";
     }
   }
 

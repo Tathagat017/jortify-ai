@@ -27,6 +27,7 @@ import React, { useEffect, useState } from "react";
 import { useStore } from "../../hooks/use-store";
 import { Page } from "../../stores/page-store";
 import WorkspaceSelector from "./WorkspaceSelector";
+import TagFilter from "../ai/tags/TagFilter";
 
 interface SidebarProps {
   isOpen: boolean;
@@ -513,6 +514,13 @@ const Sidebar: React.FC<SidebarProps> = observer(({ isOpen }) => {
               </Box>
             )}
           </Box>
+
+          {/* Tag Filter */}
+          {workspaceStore.selectedWorkspace && (
+            <Box mb="sm">
+              <TagFilter workspaceId={workspaceStore.selectedWorkspace.id} />
+            </Box>
+          )}
 
           {/* Settings */}
           <Box mb="sm">

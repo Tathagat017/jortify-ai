@@ -27,6 +27,10 @@ export class WorkspaceStore {
     this.queryClient = queryClient;
   }
 
+  get workspaceName(): string {
+    return this.selectedWorkspace?.name || "Your workspace";
+  }
+
   async fetchWorkspaces(): Promise<Workspace[]> {
     const token = localStorage.getItem("jortify_token");
     if (!token) {

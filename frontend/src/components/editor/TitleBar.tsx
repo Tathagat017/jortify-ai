@@ -9,13 +9,15 @@ import {
 } from "@fortawesome/free-solid-svg-icons";
 import { observer } from "mobx-react-lite";
 import { useStore } from "../../hooks/use-store";
+import PageTags from "../ai/tags/PageTags";
+import TagActions from "../ai/tags/TagActions";
 
 const TitleBar: React.FC = observer(() => {
-  const { pageStore } = useStore();
+  const { pageStore, workspaceStore } = useStore();
   const selectedPage = pageStore.selectedPage;
   let workspaceName = "Your workspace";
   if (selectedPage) {
-    workspaceName = pageStore.getWorkspaceNameForPage(selectedPage.id);
+    workspaceName = workspaceStore.workspaceName;
   }
   return (
     <Box
@@ -39,10 +41,28 @@ const TitleBar: React.FC = observer(() => {
         <Text size="sm" weight={500}>
           {selectedPage ? selectedPage?.title : "Untitled"}
         </Text>
+
+        {/* Page Tags */}
+        {selectedPage && workspaceStore.selectedWorkspace && (
+          <PageTags
+            pageId={selectedPage.id}
+            workspaceId={workspaceStore.selectedWorkspace.id}
+            size="xs"
+          />
+        )}
       </Group>
 
       {/* Actions */}
       <Group spacing="xs">
+        {/* Tag Actions - positioned left of share icon */}
+        {selectedPage && workspaceStore.selectedWorkspace && (
+          <TagActions
+            pageId={selectedPage.id}
+            workspaceId={workspaceStore.selectedWorkspace.id}
+            size="sm"
+          />
+        )}
+
         <ActionIcon variant="subtle" size="sm">
           <FontAwesomeIcon icon={faShare} />
         </ActionIcon>

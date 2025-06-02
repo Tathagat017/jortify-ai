@@ -26,6 +26,18 @@ router.get("/:id/children", asyncHandler(PageController.getPageChildren));
 // Get backlinks for a page
 router.get("/:id/backlinks", asyncHandler(PageController.getPageBacklinks));
 
+// Get tags for a page
+router.get("/:id/tags", asyncHandler(PageController.getPageTags));
+
+// Add tag to page
+router.post("/:id/tags", asyncHandler(PageController.addTagToPage));
+
+// Remove tag from page
+router.delete(
+  "/:id/tags/:tagId",
+  asyncHandler(PageController.removeTagFromPage)
+);
+
 // Create a new page
 router.post("/", asyncHandler(PageController.createPage));
 

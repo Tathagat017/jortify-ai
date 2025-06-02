@@ -505,4 +505,123 @@ export class PageController {
       timestamp: new Date().toISOString(),
     });
   }
+
+  // Get tags for a page
+  static async getPageTags(req: Request, res: Response) {
+    const { id } = req.params;
+
+    const { data: pageTags, error } = await supabase
+      .from("page_tags")
+      .select(
+        `
+        tag_id,
+        tags (
+          id,
+          name,
+          color,
+          workspace_id,
+          created_at
+        )
+      `
+      )
+      .eq("page_id", id);
+
+    if (error) throw new AppError(500, "Failed to fetch page tags");
+
+    // Extract the tag objects from the join result
+    const tags = pageTags?.map((pt: any) => pt.tags) || [];
+    res.json(tags);
+  }
+
+  // Add tag to page
+  static async addTagToPage(req: Request, res: Response) {
+    const { id: pageId } = req.params;
+    const { tagId } = req.body;
+
+    if (!tagId) {
+      throw new AppError(400, "Tag ID is required");
+    }
+
+    // Validate that the page exists
+    const { data: page, error: pageError } = await supabase
+      .from("pages")
+      .select("id")
+      .eq("id", pageId)
+      .single();
+
+    if (pageError || !page) {
+      throw new AppError(404, "Page not found");
+    }
+
+    // Validate that the tag exists
+    const { data: tag, error: tagError } = await supabase
+      .from("tags")
+      .select("id")
+      .eq("id", tagId)
+      .single();
+
+    if (tagError || !tag) {
+      throw new AppError(404, "Tag not found");
+    }
+
+    // Check if the relationship already exists
+    const { data: existing, error: existingError } = await supabase
+      .from("page_tags")
+      .select("*")
+      .eq("page_id", pageId)
+      .eq("tag_id", tagId)
+      .single();
+
+    if (existingError && existingError.code !== "PGRST116") {
+      throw new AppError(500, "Failed to check existing tag relationship");
+    }
+
+    if (existing) {
+      throw new AppError(409, "Tag is already associated with this page");
+    }
+
+    // Create the relationship
+    const { data: pageTag, error } = await supabase
+      .from("page_tags")
+      .insert([{ page_id: pageId, tag_id: tagId }])
+      .select()
+      .single();
+
+    if (error) throw new AppError(500, "Failed to add tag to page");
+
+    res.status(201).json({
+      message: "Tag added to page successfully",
+      pageTag,
+    });
+  }
+
+  // Remove tag from page
+  static async removeTagFromPage(req: Request, res: Response) {
+    const { id: pageId, tagId } = req.params;
+
+    // Validate that the relationship exists
+    const { data: existing, error: existingError } = await supabase
+      .from("page_tags")
+      .select("*")
+      .eq("page_id", pageId)
+      .eq("tag_id", tagId)
+      .single();
+
+    if (existingError || !existing) {
+      throw new AppError(404, "Tag relationship not found");
+    }
+
+    // Remove the relationship
+    const { error } = await supabase
+      .from("page_tags")
+      .delete()
+      .eq("page_id", pageId)
+      .eq("tag_id", tagId);
+
+    if (error) throw new AppError(500, "Failed to remove tag from page");
+
+    res.json({
+      message: "Tag removed from page successfully",
+    });
+  }
 }
