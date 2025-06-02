@@ -1,6 +1,6 @@
 import { makeAutoObservable } from "mobx";
 import { User, Session } from "@supabase/supabase-js";
-import axios from "axios";
+import axiosInstance from "../lib/axios";
 import { QueryClient } from "@tanstack/react-query";
 
 const USER_KEY = "jortify_user";
@@ -12,8 +12,6 @@ export class AuthStore {
   loading: boolean = false;
   error: string | null = null;
   queryClient: QueryClient;
-  private baseUrl: string =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:8080";
 
   constructor(queryClient: QueryClient) {
     makeAutoObservable(this);
@@ -50,15 +48,21 @@ export class AuthStore {
     this.queryClient.invalidateQueries();
   }
 
+  isAuthenticated(): boolean {
+    const userStr = localStorage.getItem(USER_KEY);
+    const token = localStorage.getItem(TOKEN_KEY);
+    return !!(userStr && token);
+  }
+
   async signUp(email: string, password: string) {
     try {
       this.loading = true;
       this.error = null;
 
-      const response = await axios.post<{
+      const response = await axiosInstance.post<{
         data: { user: User | null; session: Session | null };
         error: Error | null;
-      }>(`${this.baseUrl}/api/auth/signup`, {
+      }>(`/api/auth/signup`, {
         email,
         password,
       });
@@ -93,10 +97,10 @@ export class AuthStore {
       this.loading = true;
       this.error = null;
 
-      const response = await axios.post<{
+      const response = await axiosInstance.post<{
         data: { user: User | null; session: Session | null };
         error: Error | null;
-      }>(`${this.baseUrl}/api/auth/signin`, {
+      }>(`/api/auth/signin`, {
         email,
         password,
       });
@@ -132,8 +136,8 @@ export class AuthStore {
       this.loading = true;
       this.error = null;
 
-      const response = await axios.post<{ error: Error | null }>(
-        `${this.baseUrl}/api/auth/signout`,
+      const response = await axiosInstance.post<{ error: Error | null }>(
+        `/api/auth/signout`,
         null,
         {
           headers: {

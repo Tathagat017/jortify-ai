@@ -1,136 +1,163 @@
-import axios, { AxiosResponse } from "axios";
+import axiosInstance from "../lib/axios";
+import { AxiosResponse } from "axios";
 import { Tag } from "../stores/tag-store";
 
 class TagService {
-  private baseUrl: string =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
-
-  private async getAuthHeaders() {
-    const token = localStorage.getItem("jortify_token");
-    if (!token) {
-      throw new Error("No authentication token found");
-    }
-    return {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    };
-  }
-
   // =================== TAG CRUD OPERATIONS ===================
 
-  async getAllTags(workspaceId: string): Promise<Tag[]> {
-    const headers = await this.getAuthHeaders();
-    const response: AxiosResponse<Tag[]> = await axios.get(
-      `${this.baseUrl}/api/tags`,
-      {
-        headers,
-        params: { workspace_id: workspaceId },
-      }
-    );
-    return response.data;
+  async getAllTags(): Promise<Tag[]> {
+    try {
+      const response: AxiosResponse<Tag[]> = await axiosInstance.get(
+        `/api/tags`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching tags:", error);
+      throw error;
+    }
   }
 
-  async createTag(
-    name: string,
-    color: string,
-    workspaceId: string
-  ): Promise<Tag> {
-    const headers = await this.getAuthHeaders();
-    const response: AxiosResponse<Tag> = await axios.post(
-      `${this.baseUrl}/api/tags`,
-      {
-        name,
-        color,
-        workspace_id: workspaceId,
-      },
-      { headers }
-    );
-    return response.data;
+  async createTag(name: string, color?: string): Promise<Tag> {
+    try {
+      const response: AxiosResponse<Tag> = await axiosInstance.post(
+        `/api/tags`,
+        { name, color }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error creating tag:", error);
+      throw error;
+    }
   }
 
-  async updateTag(tagId: string, name: string, color: string): Promise<Tag> {
-    const headers = await this.getAuthHeaders();
-    const response: AxiosResponse<Tag> = await axios.put(
-      `${this.baseUrl}/api/tags/${tagId}`,
-      { name, color },
-      { headers }
-    );
-    return response.data;
+  async updateTag(id: string, updates: Partial<Tag>): Promise<Tag> {
+    try {
+      const response: AxiosResponse<Tag> = await axiosInstance.put(
+        `/api/tags/${id}`,
+        updates
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error updating tag:", error);
+      throw error;
+    }
   }
 
-  async deleteTag(tagId: string): Promise<void> {
-    const headers = await this.getAuthHeaders();
-    await axios.delete(`${this.baseUrl}/api/tags/${tagId}`, { headers });
+  async deleteTag(id: string): Promise<void> {
+    try {
+      await axiosInstance.delete(`/api/tags/${id}`);
+    } catch (error) {
+      console.error("Error deleting tag:", error);
+      throw error;
+    }
   }
 
   // =================== PAGE TAG OPERATIONS ===================
 
+  async getTagsByPageId(pageId: string): Promise<Tag[]> {
+    try {
+      const response: AxiosResponse<Tag[]> = await axiosInstance.get(
+        `/api/tags/page/${pageId}`
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching tags for page:", error);
+      throw error;
+    }
+  }
+
   async addTagToPage(pageId: string, tagId: string): Promise<void> {
-    const headers = await this.getAuthHeaders();
-    await axios.post(
-      `${this.baseUrl}/api/pages/${pageId}/tags`,
-      { tagId },
-      { headers }
-    );
+    try {
+      await axiosInstance.post(`/api/tags/page/${pageId}/tag/${tagId}`);
+    } catch (error) {
+      console.error("Error adding tag to page:", error);
+      throw error;
+    }
   }
 
   async removeTagFromPage(pageId: string, tagId: string): Promise<void> {
-    const headers = await this.getAuthHeaders();
-    await axios.delete(`${this.baseUrl}/api/pages/${pageId}/tags/${tagId}`, {
-      headers,
-    });
+    try {
+      await axiosInstance.delete(`/api/tags/page/${pageId}/tag/${tagId}`);
+    } catch (error) {
+      console.error("Error removing tag from page:", error);
+      throw error;
+    }
   }
 
-  async getPageTags(pageId: string): Promise<Tag[]> {
-    const headers = await this.getAuthHeaders();
-    const response: AxiosResponse<Tag[]> = await axios.get(
-      `${this.baseUrl}/api/pages/${pageId}/tags`,
-      { headers }
-    );
-    return response.data;
+  async getPagesByTagId(
+    tagId: string
+  ): Promise<{ id: string; title: string }[]> {
+    try {
+      const response: AxiosResponse<{ id: string; title: string }[]> =
+        await axiosInstance.get(`/api/tags/${tagId}/pages`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching pages for tag:", error);
+      throw error;
+    }
   }
 
   // =================== BULK OPERATIONS ===================
 
-  async addMultipleTagsToPage(pageId: string, tagIds: string[]): Promise<void> {
-    const headers = await this.getAuthHeaders();
-    await Promise.all(
-      tagIds.map((tagId) =>
-        axios.post(
-          `${this.baseUrl}/api/pages/${pageId}/tags`,
-          { tagId },
-          { headers }
-        )
-      )
-    );
-  }
-
-  async removeMultipleTagsFromPage(
-    pageId: string,
-    tagIds: string[]
-  ): Promise<void> {
-    const headers = await this.getAuthHeaders();
-    await Promise.all(
-      tagIds.map((tagId) =>
-        axios.delete(`${this.baseUrl}/api/pages/${pageId}/tags/${tagId}`, {
-          headers,
-        })
-      )
-    );
+  async bulkCreateTags(
+    tags: { name: string; color?: string }[]
+  ): Promise<Tag[]> {
+    try {
+      const response: AxiosResponse<Tag[]> = await axiosInstance.post(
+        `/api/tags/bulk`,
+        { tags }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error bulk creating tags:", error);
+      throw error;
+    }
   }
 
   // =================== SEARCH AND FILTER ===================
 
-  async searchTags(workspaceId: string, query: string): Promise<Tag[]> {
-    const tags = await this.getAllTags(workspaceId);
-    return tags.filter((tag) =>
-      tag.name.toLowerCase().includes(query.toLowerCase())
-    );
+  async searchTags(query: string): Promise<Tag[]> {
+    try {
+      const response: AxiosResponse<Tag[]> = await axiosInstance.get(
+        `/api/tags/search`,
+        {
+          params: { q: query },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error searching tags:", error);
+      throw error;
+    }
   }
 
-  async getTagsByColor(workspaceId: string, color: string): Promise<Tag[]> {
-    const tags = await this.getAllTags(workspaceId);
-    return tags.filter((tag) => tag.color === color);
+  async getTagUsageStats(): Promise<
+    { tagId: string; tagName: string; usageCount: number }[]
+  > {
+    try {
+      const response: AxiosResponse<
+        { tagId: string; tagName: string; usageCount: number }[]
+      > = await axiosInstance.get(`/api/tags/stats`);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching tag usage stats:", error);
+      throw error;
+    }
+  }
+
+  async getAutocompleteTags(query: string): Promise<Tag[]> {
+    try {
+      const response: AxiosResponse<Tag[]> = await axiosInstance.get(
+        `/api/tags/autocomplete`,
+        {
+          params: { q: query },
+        }
+      );
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching autocomplete tags:", error);
+      throw error;
+    }
   }
 }
 

@@ -17,6 +17,8 @@ import {
   faEdit,
   faTrash,
   faBuilding,
+  faSignOutAlt,
+  faUser,
 } from "@fortawesome/free-solid-svg-icons";
 import { useStore } from "../../hooks/use-store";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -28,11 +30,12 @@ interface WorkspaceSelectorProps {
 
 const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = observer(
   ({ userEmail }) => {
-    const { workspaceStore } = useStore();
+    const { workspaceStore, authStore, pageStore } = useStore();
     const [isCreating, setIsCreating] = useState(false);
     const [isEditing, setIsEditing] = useState<string | null>(null);
     const [newWorkspaceName, setNewWorkspaceName] = useState("");
     const [editWorkspaceName, setEditWorkspaceName] = useState("");
+    const [userPopoverOpen, setUserPopoverOpen] = useState(false);
 
     // Fetch workspaces
     const { data: workspaces = [], isLoading } = useQuery({
@@ -107,11 +110,16 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = observer(
 
     const handleWorkspaceSelect = (workspace: Workspace) => {
       workspaceStore.selectWorkspace(workspace);
+      pageStore.setSelectedPageAsNull();
+    };
+
+    const handleLogout = async () => {
+      await authStore.signOut();
+      setUserPopoverOpen(false);
     };
 
     const selectedWorkspace = workspaceStore.selectedWorkspace;
-    const displayName =
-      userEmail.length > 20 ? userEmail.substring(0, 17) + "..." : userEmail;
+    const displayName = userEmail;
 
     if (isLoading) {
       return (
@@ -131,23 +139,74 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = observer(
 
     return (
       <Box style={{ marginBottom: "12px" }}>
-        {/* User info */}
-        <Box
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: "8px",
-            padding: "6px 8px",
-            marginBottom: "8px",
-            fontSize: "12px",
-            color: "#666",
-            width: "100%",
-          }}
+        {/* User info with logout popover */}
+        <Popover
+          width={"target"}
+          position="bottom-start"
+          withArrow
+          shadow="md"
+          opened={userPopoverOpen}
+          onChange={setUserPopoverOpen}
+          zIndex={1002}
         >
-          <Text size="lg" style={{ width: "100%" }} color="#666">
-            {displayName}
-          </Text>
-        </Box>
+          <Popover.Target>
+            <Box
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "8px",
+                padding: "6px 8px",
+                marginBottom: "8px",
+                fontSize: "12px",
+                color: "#666",
+                width: "100%",
+                cursor: "pointer",
+                borderRadius: "4px",
+                transition: "background-color 0.15s ease",
+                position: "relative",
+                zIndex: 1,
+              }}
+              onClick={() => setUserPopoverOpen(!userPopoverOpen)}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.backgroundColor = "#f8f9fa")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.backgroundColor = "transparent")
+              }
+            >
+              <FontAwesomeIcon icon={faUser} size="sm" color="#666" />
+              <Text
+                size="sm"
+                style={{
+                  flex: 1,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                  marginRight: "8px",
+                }}
+                color="#666"
+              >
+                {displayName}
+              </Text>
+              <FontAwesomeIcon icon={faChevronDown} size="xs" color="#666" />
+            </Box>
+          </Popover.Target>
+          <Popover.Dropdown>
+            <Box style={{ padding: "4px" }}>
+              <Button
+                variant="white"
+                size="sm"
+                color="dark"
+                fullWidth
+                leftIcon={<FontAwesomeIcon icon={faSignOutAlt} size="sm" />}
+                onClick={handleLogout}
+                style={{ justifyContent: "flex-start" }}
+              >
+                Log out
+              </Button>
+            </Box>
+          </Popover.Dropdown>
+        </Popover>
 
         {/* Workspace Selector and Add Button */}
         <Box style={{ display: "flex", gap: "8px", alignItems: "center" }}>
@@ -230,7 +289,10 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = observer(
                           size="xs"
                           color="dark"
                           variant="filled"
-                          onClick={() => handleUpdateWorkspace(workspace.id)}
+                          onClick={() => {
+                            handleUpdateWorkspace(workspace.id);
+                            pageStore.setSelectedPageAsNull();
+                          }}
                           loading={updateWorkspaceMutation.isLoading}
                         >
                           Save

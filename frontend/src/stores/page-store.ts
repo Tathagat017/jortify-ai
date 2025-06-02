@@ -1,6 +1,7 @@
 import { makeAutoObservable, runInAction } from "mobx";
 import { QueryClient } from "@tanstack/react-query";
-import axios, { AxiosResponse } from "axios";
+import axiosInstance from "../lib/axios";
+import { AxiosResponse } from "axios";
 import type { PartialBlock } from "@blocknote/core";
 import editorStore from "./editor-store";
 import { UploadService } from "../services/upload.service";
@@ -63,8 +64,6 @@ export class PageStore {
   selectedPage: Page | null = null;
   loading: boolean = false;
   error: string | null = null;
-  private baseUrl: string =
-    import.meta.env.VITE_API_BASE_URL || "http://localhost:3001";
   private autoTagTimeout: NodeJS.Timeout | null = null;
   private typingTimeout: NodeJS.Timeout | null = null;
   private isUserTyping: boolean = false;
@@ -82,8 +81,8 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page[]> = await axios.get(
-        `${this.baseUrl}/api/pages/workspace/${workspaceId}`,
+      const res: AxiosResponse<Page[]> = await axiosInstance.get(
+        `/api/pages/workspace/${workspaceId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         }
@@ -114,6 +113,10 @@ export class PageStore {
     }
   }
 
+  setSelectedPageAsNull() {
+    this.selectedPage = null;
+  }
+
   // Legacy method for backward compatibility
   async fetchPagesForUser(): Promise<Page[]> {
     const token = localStorage.getItem("jortify_token");
@@ -123,12 +126,7 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page[]> = await axios.get(
-        `${this.baseUrl}/api/pages`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const res: AxiosResponse<Page[]> = await axiosInstance.get(`/api/pages`);
 
       runInAction(() => {
         this.pages = res.data.filter((p: Page) => !p.is_deleted);
@@ -171,8 +169,8 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page> = await axios.post(
-        `${this.baseUrl}/api/pages`,
+      const res: AxiosResponse<Page> = await axiosInstance.post(
+        `/api/pages`,
         newPageData,
         {
           headers: {
@@ -234,8 +232,8 @@ export class PageStore {
       });
 
       // Then make the API call (don't include user_id in updates)
-      const res: AxiosResponse<Page> = await axios.put(
-        `${this.baseUrl}/api/pages/${pageId}`,
+      const res: AxiosResponse<Page> = await axiosInstance.put(
+        `/api/pages/${pageId}`,
         processedUpdates,
         {
           headers: {
@@ -286,8 +284,8 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page> = await axios.post(
-        `${this.baseUrl}/api/pages/${pageId}/duplicate`,
+      const res: AxiosResponse<Page> = await axiosInstance.post(
+        `/api/pages/${pageId}/duplicate`,
         {
           title:
             title ||
@@ -332,8 +330,8 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page> = await axios.patch(
-        `${this.baseUrl}/api/pages/${pageId}/move`,
+      const res: AxiosResponse<Page> = await axiosInstance.patch(
+        `/api/pages/${pageId}/move`,
         {
           parent_id: newParentId,
         },
@@ -376,7 +374,7 @@ export class PageStore {
 
     try {
       this.loading = true;
-      await axios.delete(`${this.baseUrl}/api/pages/${pageId}`, {
+      await axiosInstance.delete(`/api/pages/${pageId}`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -418,8 +416,8 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page> = await axios.patch(
-        `${this.baseUrl}/api/pages/${pageId}`,
+      const res: AxiosResponse<Page> = await axiosInstance.patch(
+        `/api/pages/${pageId}`,
         { is_deleted: false },
         {
           headers: {
@@ -460,7 +458,7 @@ export class PageStore {
 
     try {
       this.loading = true;
-      await axios.delete(`${this.baseUrl}/api/pages/${pageId}`, {
+      await axiosInstance.delete(`/api/pages/${pageId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -507,11 +505,8 @@ export class PageStore {
     }
 
     try {
-      const res: AxiosResponse<Page> = await axios.get(
-        `${this.baseUrl}/api/pages/${id}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
+      const res: AxiosResponse<Page> = await axiosInstance.get(
+        `/api/pages/${id}`
       );
       return res.data;
     } catch (error) {
@@ -601,8 +596,8 @@ export class PageStore {
 
     try {
       this.loading = true;
-      const res: AxiosResponse<Page> = await axios.put(
-        `${this.baseUrl}/api/pages/${pageId}`,
+      const res: AxiosResponse<Page> = await axiosInstance.put(
+        `/api/pages/${pageId}`,
         { content },
         {
           headers: {

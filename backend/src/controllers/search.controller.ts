@@ -10,6 +10,21 @@ const searchSchema = Joi.object({
   workspace_id: Joi.string().uuid().required(),
   limit: Joi.number().integer().min(1).max(100).default(20),
   offset: Joi.number().integer().min(0).default(0),
+  similarity_threshold: Joi.number().min(0).max(1).default(0.7),
+  filters: Joi.object({
+    searchBehavior: Joi.string().valid("simple", "semantic").default("simple"),
+    searchIn: Joi.object({
+      pageName: Joi.boolean().default(true),
+      subPageName: Joi.boolean().default(true),
+      pageContent: Joi.boolean().default(true),
+    }).default({}),
+    metadata: Joi.object({
+      tags: Joi.array().items(Joi.string().uuid()).default([]),
+      workspaceType: Joi.string()
+        .valid("public", "private", "all")
+        .default("all"),
+    }).default({}),
+  }).default({}),
 });
 
 const suggestionSchema = Joi.object({
@@ -29,10 +44,10 @@ export class SearchController {
       );
     }
 
-    const { query, workspace_id, limit, offset } = value;
+    const { query, workspace_id, limit, offset, filters } = value;
 
-    // Use PostgreSQL full-text search
-    const { data: pages, error } = await supabase
+    // Build search query based on filters
+    let searchQuery = supabase
       .from("pages")
       .select(
         `
@@ -43,33 +58,141 @@ export class SearchController {
         updated_at,
         icon_url,
         cover_url,
-        ts_rank(to_tsvector('english', title || ' ' || coalesce(content::text, '')), plainto_tsquery('english', $1)) as rank
+        summary,
+        parent_id
       `
       )
       .eq("workspace_id", workspace_id)
-      .textSearch("title,content", query, { type: "websearch" })
-      .order("rank", { ascending: false })
-      .range(offset, offset + limit - 1);
+      .eq("is_deleted", false);
+
+    // Apply search filters
+    if (filters.searchIn) {
+      const searchFields = [];
+      if (filters.searchIn.pageName) searchFields.push("title");
+      if (filters.searchIn.pageContent) searchFields.push("content");
+
+      if (searchFields.length > 0) {
+        if (filters.searchBehavior === "simple") {
+          // Simple search: use plain text search for partial matching
+          searchQuery = searchQuery.textSearch(searchFields.join(","), query, {
+            type: "plain",
+          });
+        } else {
+          // Semantic search: use websearch for whole word matching
+          searchQuery = searchQuery.textSearch(searchFields.join(","), query, {
+            type: "websearch",
+          });
+        }
+      }
+    } else {
+      if (filters.searchBehavior === "simple") {
+        // Simple search: use plain text search for partial matching
+        searchQuery = searchQuery.textSearch("title,content", query, {
+          type: "plain",
+        });
+      } else {
+        // Semantic search: use websearch for whole word matching
+        searchQuery = searchQuery.textSearch("title,content", query, {
+          type: "websearch",
+        });
+      }
+    }
+
+    // Apply parent_id filter for sub-pages
+    if (filters.searchIn?.subPageName === false) {
+      searchQuery = searchQuery.is("parent_id", null);
+    }
+
+    const { data: pages, error } = await searchQuery.range(
+      offset,
+      offset + limit - 1
+    );
 
     if (error) {
       console.error("Search error:", error);
       throw new AppError(500, "Search failed");
     }
 
-    // Get total count for pagination
-    const { count, error: countError } = await supabase
+    // Get total count for pagination using same search logic
+    let countQuery = supabase
       .from("pages")
       .select("*", { count: "exact", head: true })
       .eq("workspace_id", workspace_id)
-      .textSearch("title,content", query, { type: "websearch" });
+      .eq("is_deleted", false);
+
+    if (filters.searchIn) {
+      const searchFields = [];
+      if (filters.searchIn.pageName) searchFields.push("title");
+      if (filters.searchIn.pageContent) searchFields.push("content");
+
+      if (searchFields.length > 0) {
+        if (filters.searchBehavior === "simple") {
+          // Simple search: use plain text search for partial matching
+          countQuery = countQuery.textSearch(searchFields.join(","), query, {
+            type: "plain",
+          });
+        } else {
+          // Semantic search: use websearch for whole word matching
+          countQuery = countQuery.textSearch(searchFields.join(","), query, {
+            type: "websearch",
+          });
+        }
+      }
+    } else {
+      if (filters.searchBehavior === "simple") {
+        // Simple search: use plain text search for partial matching
+        countQuery = countQuery.textSearch("title,content", query, {
+          type: "plain",
+        });
+      } else {
+        // Semantic search: use websearch for whole word matching
+        countQuery = countQuery.textSearch("title,content", query, {
+          type: "websearch",
+        });
+      }
+    }
+
+    if (filters.searchIn?.subPageName === false) {
+      countQuery = countQuery.is("parent_id", null);
+    }
+
+    const { count, error: countError } = await countQuery;
 
     if (countError) {
       console.error("Count error:", countError);
       throw new AppError(500, "Failed to count search results");
     }
 
+    // Transform results to include tags properly
+    const transformedResults = await Promise.all(
+      (pages || []).map(async (page: any) => {
+        // Fetch tags for this page
+        const { data: pageTags } = await supabase
+          .from("page_tags")
+          .select(
+            `
+            tag:tags(id, name, color)
+          `
+          )
+          .eq("page_id", page.id);
+
+        return {
+          id: page.id,
+          title: page.title,
+          content: page.content,
+          created_at: page.created_at,
+          updated_at: page.updated_at,
+          icon_url: page.icon_url,
+          cover_url: page.cover_url,
+          summary: page.summary,
+          parent_id: page.parent_id,
+          tags: pageTags?.map((pt: any) => pt.tag) || [],
+        };
+      })
+    );
+
     res.json({
-      results: pages || [],
+      results: transformedResults,
       pagination: {
         limit,
         offset,
@@ -90,9 +213,14 @@ export class SearchController {
       );
     }
 
-    const { query, workspace_id, limit, offset } = value;
-    const similarity_threshold =
-      parseFloat(req.body.similarity_threshold) || 0.7;
+    const {
+      query,
+      workspace_id,
+      limit,
+      offset,
+      filters,
+      similarity_threshold,
+    } = value;
 
     try {
       // Use EmbeddingService for semantic search
@@ -103,16 +231,42 @@ export class SearchController {
         similarity_threshold
       );
 
+      // Apply tag filtering if specified
+      let filteredResults = results;
+      if (filters.metadata?.tags && filters.metadata.tags.length > 0) {
+        // Fetch tags for all results first
+        const resultsWithTags = await Promise.all(
+          results.map(async (page: any) => {
+            const { data: pageTags } = await supabase
+              .from("page_tags")
+              .select("tag_id")
+              .eq("page_id", page.id);
+
+            return {
+              ...page,
+              tagIds: pageTags?.map((pt: any) => pt.tag_id) || [],
+            };
+          })
+        );
+
+        // Filter by tags
+        filteredResults = resultsWithTags.filter((page: any) =>
+          page.tagIds.some((tagId: string) =>
+            filters.metadata.tags.includes(tagId)
+          )
+        );
+      }
+
       // Apply offset for pagination
-      const paginatedResults = results.slice(offset, offset + limit);
+      const paginatedResults = filteredResults.slice(offset, offset + limit);
 
       res.json({
         results: paginatedResults,
         pagination: {
           limit,
           offset,
-          total: results.length,
-          hasMore: offset + limit < results.length,
+          total: filteredResults.length,
+          hasMore: offset + limit < filteredResults.length,
         },
         query,
         similarity_threshold,
@@ -123,22 +277,137 @@ export class SearchController {
         embeddingError
       );
 
-      // Fallback to regular text search if embeddings fail
-      const { data: pages, error } = await supabase
-        .from("pages")
-        .select(
-          "id, title, content, created_at, updated_at, icon_url, cover_url"
-        )
-        .eq("workspace_id", workspace_id)
-        .textSearch("title,content", query, { type: "websearch" })
-        .range(offset, offset + limit - 1);
+      // Fallback to regular text search with filters
+      const hasTagFilter =
+        filters.metadata?.tags && filters.metadata.tags.length > 0;
 
-      if (error) {
-        throw new AppError(500, "Both semantic and text search failed");
+      let searchQuery;
+      if (hasTagFilter) {
+        // If filtering by tags, we need to join with page_tags table
+        searchQuery = supabase
+          .from("pages")
+          .select(
+            `
+            id, 
+            title, 
+            content,
+            created_at,
+            updated_at,
+            icon_url,
+            cover_url,
+            summary,
+            parent_id,
+            page_tags!inner(tag_id)
+          `
+          )
+          .eq("workspace_id", workspace_id)
+          .eq("is_deleted", false)
+          .in("page_tags.tag_id", filters.metadata.tags);
+      } else {
+        searchQuery = supabase
+          .from("pages")
+          .select(
+            `
+            id, 
+            title, 
+            content,
+            created_at,
+            updated_at,
+            icon_url,
+            cover_url,
+            summary,
+            parent_id
+          `
+          )
+          .eq("workspace_id", workspace_id)
+          .eq("is_deleted", false);
       }
 
+      // Apply search filters based on search behavior
+      if (filters.searchIn) {
+        const searchFields = [];
+        if (filters.searchIn.pageName) searchFields.push("title");
+        if (filters.searchIn.pageContent) searchFields.push("content");
+
+        if (searchFields.length > 0) {
+          if (filters.searchBehavior === "simple") {
+            // Simple search: use plain text search for partial matching
+            searchQuery = searchQuery.textSearch(
+              searchFields.join(","),
+              query,
+              {
+                type: "plain",
+              }
+            );
+          } else {
+            // Semantic search: use websearch for whole word matching
+            searchQuery = searchQuery.textSearch(
+              searchFields.join(","),
+              query,
+              {
+                type: "websearch",
+              }
+            );
+          }
+        }
+      } else {
+        if (filters.searchBehavior === "simple") {
+          // Simple search: use plain text search for partial matching
+          searchQuery = searchQuery.textSearch("title,content", query, {
+            type: "plain",
+          });
+        } else {
+          // Semantic search: use websearch for whole word matching
+          searchQuery = searchQuery.textSearch("title,content", query, {
+            type: "websearch",
+          });
+        }
+      }
+
+      // Apply parent_id filter for sub-pages
+      if (filters.searchIn?.subPageName === false) {
+        searchQuery = searchQuery.is("parent_id", null);
+      }
+
+      const { data: pages, error } = await searchQuery.range(
+        offset,
+        offset + limit - 1
+      );
+
+      if (error) {
+        console.error("Fallback search error:", error);
+        throw new AppError(500, "Search failed");
+      }
+
+      // Transform results to include tags
+      const transformedResults = await Promise.all(
+        (pages || []).map(async (page: any) => {
+          const { data: pageTags } = await supabase
+            .from("page_tags")
+            .select(
+              `
+              tag:tags(id, name, color)
+            `
+            )
+            .eq("page_id", page.id);
+
+          return {
+            id: page.id,
+            title: page.title,
+            content: page.content,
+            created_at: page.created_at,
+            updated_at: page.updated_at,
+            icon_url: page.icon_url,
+            cover_url: page.cover_url,
+            summary: page.summary,
+            parent_id: page.parent_id,
+            tags: pageTags?.map((pt: any) => pt.tag) || [],
+          };
+        })
+      );
+
       res.json({
-        results: pages || [],
+        results: transformedResults,
         pagination: {
           limit,
           offset,
@@ -291,6 +560,117 @@ export class SearchController {
       message: "Embedding generation started",
       workspace_id,
       note: "Process is running in background",
+    });
+  }
+
+  // Search pages by tags only
+  static async searchByTags(req: Request, res: Response) {
+    const { error: validationError, value } = Joi.object({
+      workspace_id: Joi.string().uuid().required(),
+      tag_ids: Joi.array().items(Joi.string().uuid()).min(1).required(),
+      limit: Joi.number().integer().min(1).max(100).default(20),
+      offset: Joi.number().integer().min(0).default(0),
+    }).validate(req.body);
+
+    if (validationError) {
+      throw new AppError(
+        400,
+        `Validation error: ${validationError.details[0].message}`
+      );
+    }
+
+    const { workspace_id, tag_ids, limit, offset } = value;
+
+    // Get pages that have any of the specified tags
+    const { data: pageIds, error: pageIdsError } = await supabase
+      .from("page_tags")
+      .select("page_id")
+      .in("tag_id", tag_ids);
+
+    if (pageIdsError) {
+      console.error("Error fetching page IDs by tags:", pageIdsError);
+      throw new AppError(500, "Failed to search by tags");
+    }
+
+    if (!pageIds || pageIds.length === 0) {
+      res.json({
+        results: [],
+        pagination: {
+          limit,
+          offset,
+          total: 0,
+          hasMore: false,
+        },
+        tag_ids,
+      });
+      return;
+    }
+
+    const uniquePageIds = [...new Set(pageIds.map((p) => p.page_id))];
+
+    // Get the actual pages
+    const { data: pages, error } = await supabase
+      .from("pages")
+      .select(
+        `
+        id, 
+        title, 
+        content,
+        created_at,
+        updated_at,
+        icon_url,
+        cover_url,
+        summary,
+        parent_id
+      `
+      )
+      .eq("workspace_id", workspace_id)
+      .eq("is_deleted", false)
+      .in("id", uniquePageIds)
+      .range(offset, offset + limit - 1);
+
+    if (error) {
+      console.error("Error fetching pages:", error);
+      throw new AppError(500, "Failed to fetch pages by tags");
+    }
+
+    // Transform results to include tags
+    const transformedResults = await Promise.all(
+      (pages || []).map(async (page: any) => {
+        // Fetch tags for this page
+        const { data: pageTags } = await supabase
+          .from("page_tags")
+          .select(
+            `
+            tag:tags(id, name, color)
+          `
+          )
+          .eq("page_id", page.id);
+
+        return {
+          id: page.id,
+          title: page.title,
+          content: page.content,
+          created_at: page.created_at,
+          updated_at: page.updated_at,
+          icon_url: page.icon_url,
+          cover_url: page.cover_url,
+          summary: page.summary,
+          parent_id: page.parent_id,
+          tags: pageTags?.map((pt: any) => pt.tag) || [],
+        };
+      })
+    );
+
+    res.json({
+      results: transformedResults,
+      pagination: {
+        limit,
+        offset,
+        total: uniquePageIds.length,
+        hasMore: offset + limit < uniquePageIds.length,
+      },
+      tag_ids,
     });
   }
 }

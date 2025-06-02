@@ -8,6 +8,7 @@ import { AILinkStore } from "./ai-link-store";
 import { GraphViewStore } from "./graph-view-store";
 import { WorkspaceStore } from "./workspace-store";
 import TagStore from "./tag-store";
+import { SearchStore } from "./search-store";
 
 const queryClient = new QueryClient();
 
@@ -20,6 +21,7 @@ export const store = {
   graphViewStore: new GraphViewStore(queryClient),
   workspaceStore: new WorkspaceStore(queryClient),
   tagStore: new TagStore(queryClient),
+  searchStore: new SearchStore(queryClient),
   queryClient,
 };
 

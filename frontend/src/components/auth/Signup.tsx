@@ -51,7 +51,7 @@ export const Signup = observer(() => {
   };
 
   return (
-    <Box>
+    <Box h={"100%"}>
       <Text size="sm" color="dimmed" mb={24}>
         to continue to Jortify
       </Text>

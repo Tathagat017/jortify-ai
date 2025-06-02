@@ -15,7 +15,7 @@ import {
 } from "@mantine/core";
 import { observer } from "mobx-react-lite";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useStore } from "../../hooks/use-store";
 
 export const Login = observer(() => {
@@ -23,14 +23,18 @@ export const Login = observer(() => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const navigate = useNavigate();
+  const location = useLocation();
 
   const handleSubmit = async () => {
     authStore.resetError();
     const success = await authStore.signIn(email, password);
     if (success) {
       if (authStore.user) {
-        navigate("/dashboard");
-
+        // Get the intended destination from location state, default to dashboard
+        const from =
+          (location.state as { from?: { pathname: string } })?.from?.pathname ||
+          "/dashboard";
+        navigate(from, { replace: true });
         uiStore.closeAuthModal();
       }
     }
@@ -39,7 +43,7 @@ export const Login = observer(() => {
   // Only fetch pages if user is logged in
 
   return (
-    <Box>
+    <Box h={"100%"}>
       <Text size="sm" color="dimmed" mb={24}>
         to continue to Jortify
       </Text>
@@ -95,7 +99,7 @@ export const Login = observer(() => {
           size="xs"
           color="dark"
           onClick={() => uiStore.openAuthModal("signup")}
-          style={{ padding: 0, height: "auto" }}
+          style={{ padding: 0, height: "auto", marginBottom: 4 }}
         >
           Sign up
         </Button>

@@ -52,7 +52,7 @@ const EditorContainer = observer(() => {
             flex: 1,
             overflow: "auto",
             padding: "20px 60px",
-            maxWidth: "900px",
+
             margin: "0 auto",
             width: "100%",
           }}

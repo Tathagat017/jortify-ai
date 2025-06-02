@@ -14,12 +14,12 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "types": ["node", "jest"],
+    "types": ["node"],
     "paths": {
       "@/*": ["src/*"]
     }
   },
-  "include": ["src/**/*", "backend_tests/**/*"],
+  "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"],
   "ts-node": {
     "esm": false

@@ -3,8 +3,9 @@ import {
   Routes,
   Route,
   Navigate,
+  useLocation,
 } from "react-router-dom";
-import { MantineProvider } from "@mantine/core";
+import { MantineProvider, MantineThemeOverride } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { observer } from "mobx-react-lite";
 import { useStore } from "./hooks/use-store";
@@ -14,7 +15,7 @@ import { Suspense, lazy, Component, ErrorInfo, ReactNode } from "react";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { store, StoreProvider } from "./stores/store-context-provider";
 
-// Lazy load all pages
+// Lazy load all page
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Dashboard = lazy(() => import("./pages/DashboardPage"));
 
@@ -119,13 +120,16 @@ class LazyLoadErrorBoundary extends Component<
 const ProtectedRoute = observer(
   ({ children }: { children: React.ReactNode }) => {
     const { authStore } = useStore();
+    const location = useLocation();
 
     if (authStore.loading) {
       return <LoadingSpinner />;
     }
 
-    if (!authStore.user) {
-      return <Navigate to="/" replace />;
+    // Use the new isAuthenticated method for better checking
+    if (!authStore.user || !authStore.isAuthenticated()) {
+      // Store the current location in state to redirect after login
+      return <Navigate to="/" state={{ from: location }} replace />;
     }
 
     return (
@@ -143,11 +147,62 @@ const PublicRoute = ({ children }: { children: React.ReactNode }) => (
   </LazyLoadErrorBoundary>
 );
 
+// Mantine theme configuration with high z-index for overlays
+const theme: MantineThemeOverride = {
+  components: {
+    Popover: {
+      styles: {
+        dropdown: {
+          zIndex: 1001,
+        },
+      },
+    },
+    Modal: {
+      styles: {
+        root: {
+          zIndex: 1001,
+        },
+        inner: {
+          zIndex: 1001,
+        },
+      },
+    },
+    Menu: {
+      styles: {
+        dropdown: {
+          zIndex: 1001,
+        },
+      },
+    },
+    Tooltip: {
+      styles: {
+        tooltip: {
+          zIndex: 1001,
+        },
+      },
+    },
+    Select: {
+      styles: {
+        dropdown: {
+          zIndex: 1001,
+        },
+      },
+    },
+    MultiSelect: {
+      styles: {
+        dropdown: {
+          zIndex: 1001,
+        },
+      },
+    },
+  },
+};
+
 const App = observer(() => {
   return (
     <QueryClientProvider client={store.queryClient}>
       <StoreProvider>
-        <MantineProvider withGlobalStyles withNormalizeCSS>
+        <MantineProvider withGlobalStyles withNormalizeCSS theme={theme}>
           <Notifications position="bottom-right" zIndex={2077} />
           <Router>
             <Routes>

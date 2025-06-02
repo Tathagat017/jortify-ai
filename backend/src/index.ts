@@ -64,6 +64,9 @@ if (config.nodeEnv !== "test") {
   logger.info("Rate limiting disabled for test environment");
 }
 
+app.get("/", (req, res) => {
+  res.status(200).send("Welcome to the API");
+});
 // Health check endpoint
 app.get("/health", (req, res) => {
   res.status(200).json({ status: "ok" });

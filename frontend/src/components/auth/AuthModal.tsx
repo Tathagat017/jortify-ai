@@ -10,14 +10,14 @@ export const AuthModal: React.FC = observer(() => {
 
   return (
     <Modal
+      size="md"
       opened={uiStore.authModalOpen}
       onClose={() => uiStore.closeAuthModal()}
       title={
         uiStore.authView === "signup"
-          ? "Create your Jotion account"
-          : "Sign in to Jotion"
+          ? "Sign up for Jortify"
+          : "Sign in to Jortify"
       }
-      size="sm"
     >
       {uiStore.authView === "login" && <Login />}
       {uiStore.authView === "signup" && <Signup />}

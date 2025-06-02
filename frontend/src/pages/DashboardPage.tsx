@@ -59,7 +59,12 @@ const DashboardPage: React.FC = observer(() => {
   `;
 
   return (
-    <>
+    <div
+      style={{
+        width: "100%",
+        height: "100%",
+      }}
+    >
       <style>{gutterStyle}</style>
       <Box
         style={{
@@ -72,7 +77,8 @@ const DashboardPage: React.FC = observer(() => {
         <Box style={{ flex: 1, display: "flex", overflow: "hidden" }}>
           {uiStore.sidebarOpen ? (
             <Split
-              sizes={[30, 70]}
+              sizes={[22, 78]}
+              gutterSize={4}
               direction="horizontal"
               style={{ height: "100%", display: "flex", flex: 1 }}
               onDragEnd={(sizes) => {
@@ -91,6 +97,7 @@ const DashboardPage: React.FC = observer(() => {
                 style={{
                   height: "100%",
                   flex: 1,
+                  width: "100%",
                   overflow: "hidden",
                 }}
               >
@@ -99,9 +106,9 @@ const DashboardPage: React.FC = observer(() => {
             </Split>
           ) : (
             /* When sidebar is closed, editor takes full width */
-            <Box style={{ height: "100%", display: "flex" }}>
+            <Box style={{ height: "100%", display: "flex", width: "100%" }}>
               <Sidebar isOpen={false} />
-              <Box style={{ flex: 1, overflow: "hidden" }}>
+              <Box style={{ flex: 1, overflow: "hidden", width: "100%" }}>
                 <EditorContainer />
               </Box>
             </Box>
@@ -112,7 +119,7 @@ const DashboardPage: React.FC = observer(() => {
       {/* AI Chatbot Components */}
       <ChatbotIcon />
       <ChatbotModal />
-    </>
+    </div>
   );
 });
 

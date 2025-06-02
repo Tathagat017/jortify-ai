@@ -14,6 +14,9 @@ router.post("/text", asyncHandler(SearchController.fullTextSearch));
 // Semantic search using embeddings
 router.post("/semantic", asyncHandler(SearchController.semanticSearch));
 
+// Search pages by tags only
+router.post("/tags", asyncHandler(SearchController.searchByTags));
+
 // Auto-complete suggestions
 router.get("/suggestions", asyncHandler(SearchController.getSuggestions));
 
