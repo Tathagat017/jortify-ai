@@ -23,6 +23,8 @@ const SAVE_DEBOUNCE_MS = 1000; // 1 second debounce
 const BlockNoteEditorComponent = () => {
   const { pageStore, aiLinkStore, workspaceStore } = useStore();
   const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
+  const saveTimeoutRef = useRef<NodeJS.Timeout>();
+  const previousPageIdRef = useRef<string | null>(null);
 
   // Create editor with custom upload function
   const editor = useCreateBlockNote({
@@ -45,8 +47,6 @@ const BlockNoteEditorComponent = () => {
     },
   });
 
-  const saveTimeoutRef = useRef<NodeJS.Timeout>();
-
   // Set the editor instance in the store on mount
   useEffect(() => {
     if (!editorStore.editor) {
@@ -60,7 +60,11 @@ const BlockNoteEditorComponent = () => {
       if (!editor) return;
 
       try {
-        // Insert the AI suggestion as a new paragraph block
+        // Get current cursor position
+        const currentPosition = editor.getTextCursorPosition();
+        const currentBlock = currentPosition.block;
+
+        // Insert the AI suggestion as a new paragraph block at current position
         editor.insertBlocks(
           [
             {
@@ -68,9 +72,25 @@ const BlockNoteEditorComponent = () => {
               content: suggestion,
             },
           ],
-          editor.getTextCursorPosition().block,
+          currentBlock,
           "after"
         );
+
+        // Move cursor to the end of the newly inserted block
+        setTimeout(() => {
+          try {
+            const blocks = editor.topLevelBlocks;
+            const currentBlockIndex = blocks.findIndex(
+              (block) => block.id === currentBlock.id
+            );
+            const insertedBlockIndex = currentBlockIndex + 1;
+            if (blocks[insertedBlockIndex]) {
+              editor.setTextCursorPosition(blocks[insertedBlockIndex], "end");
+            }
+          } catch (error) {
+            console.log("Could not set cursor after AI suggestion:", error);
+          }
+        }, 10);
       } catch (error) {
         console.error("Error inserting AI suggestion:", error);
       }
@@ -529,8 +549,47 @@ const BlockNoteEditorComponent = () => {
   // Set initial content when page changes
   useEffect(() => {
     if (pageStore.selectedPage?.content && editor) {
-      const content = pageStore.selectedPage.content as PartialBlock[];
-      editor.replaceBlocks(editor.topLevelBlocks, content);
+      // Only replace content if it's actually different to avoid cursor jumps
+      const currentBlocks = editor.topLevelBlocks;
+      const newContent = pageStore.selectedPage.content as PartialBlock[];
+      const currentPageId = pageStore.selectedPage.id;
+
+      // Simple comparison - if lengths are different or page changed, update content
+      const shouldUpdate =
+        currentBlocks.length !== newContent.length ||
+        currentPageId !== previousPageIdRef.current;
+
+      if (shouldUpdate) {
+        // Store current cursor position before replacing content
+        let cursorPosition;
+        try {
+          cursorPosition = editor.getTextCursorPosition();
+        } catch (error) {
+          console.log("Could not get cursor position:", error);
+        }
+
+        editor.replaceBlocks(editor.topLevelBlocks, newContent);
+
+        // Try to restore cursor position after a brief delay
+        if (cursorPosition && newContent.length > 0) {
+          setTimeout(() => {
+            try {
+              // Try to set cursor to the last block since we can't reliably restore exact position
+              const blocks = editor.topLevelBlocks;
+              if (blocks.length > 0) {
+                // Set cursor to the end of the last block to avoid jumping to random positions
+                editor.setTextCursorPosition(blocks[blocks.length - 1], "end");
+              }
+            } catch (error) {
+              console.log("Could not restore cursor position:", error);
+            }
+          }, 10);
+        }
+
+        // Update the previous page ID
+        previousPageIdRef.current = currentPageId;
+      }
+
       // Update last saved content after setting initial content
       editorStore.setEditor(editor);
     }
