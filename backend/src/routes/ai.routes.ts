@@ -122,6 +122,14 @@ router.patch(
   asyncHandler(AIController.updateConversationTitle)
 );
 
+// =================== KNOWLEDGE GRAPH ===================
+
+// Get knowledge graph data for visualization
+router.get(
+  "/graph/workspace/:workspaceId",
+  asyncHandler(AIController.getWorkspaceKnowledgeGraph)
+);
+
 // =================== BATCH OPERATIONS ===================
 
 // Generate workspace summaries (batch operation)

@@ -390,6 +390,33 @@ class AIService {
 
     return response.generatedContent;
   }
+
+  // Get knowledge graph data for visualization
+  async getKnowledgeGraph(workspaceId: string): Promise<{
+    graph: {
+      nodes: Array<{
+        id: string;
+        label: string;
+        type: string;
+        x: number;
+        y: number;
+        connectionCount?: number;
+      }>;
+      edges: Array<{
+        id: string;
+        source: string;
+        target: string;
+        type: string;
+        weight: number;
+      }>;
+      centerNode: string | null;
+      workspaceId: string;
+      workspaceName: string;
+    };
+    timestamp: string;
+  }> {
+    return this.makeRequest(`/ai/graph/workspace/${workspaceId}`);
+  }
 }
 
 export const aiService = new AIService();

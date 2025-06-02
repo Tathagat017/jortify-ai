@@ -9,6 +9,7 @@ import { MantineProvider, MantineThemeOverride } from "@mantine/core";
 import { Notifications } from "@mantine/notifications";
 import { observer } from "mobx-react-lite";
 import { useStore } from "./hooks/use-store";
+import "@xyflow/react/dist/style.css";
 
 // Lazy load all pages and components
 import { Suspense, lazy, Component, ErrorInfo, ReactNode } from "react";

@@ -622,6 +622,247 @@ export class AIController {
     });
   }
 
+  // Get knowledge graph data for visualization (workspace-wide)
+  static async getWorkspaceKnowledgeGraph(req: Request, res: Response) {
+    const { workspaceId } = req.params;
+    const userId = req.user!.id;
+
+    // Validate workspace exists and user has access
+    const { data: workspace, error: workspaceError } = await supabase
+      .from("workspaces")
+      .select("id, name")
+      .eq("id", workspaceId)
+      .eq("user_id", userId)
+      .single();
+
+    if (workspaceError || !workspace) {
+      throw new AppError(404, "Workspace not found");
+    }
+
+    // Get all pages in the workspace
+    const { data: allPages, error: pagesError } = await supabase
+      .from("pages")
+      .select("id, title, content, created_at")
+      .eq("workspace_id", workspaceId)
+      .order("created_at", { ascending: true });
+
+    if (pagesError) {
+      throw new AppError(500, "Failed to fetch workspace pages");
+    }
+
+    if (!allPages || allPages.length === 0) {
+      return res.json({
+        success: true,
+        graph: {
+          nodes: [],
+          edges: [],
+          centerNode: null,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    }
+
+    // Helper function to extract links from page content
+    const extractLinksFromContent = (content: any[]): string[] => {
+      const links: string[] = [];
+
+      const traverseContent = (blocks: any[]) => {
+        if (!Array.isArray(blocks)) return;
+
+        blocks.forEach((block) => {
+          // Handle different BlockNote content structures
+          if (block.type === "link" && block.href) {
+            // Extract page ID from href like "/page/uuid"
+            const match = block.href.match(/\/page\/([a-f0-9-]+)/);
+            if (match) {
+              links.push(match[1]);
+            }
+          }
+
+          // Check for text blocks with inline links
+          if (block.type === "paragraph" || block.type === "heading") {
+            if (block.content && Array.isArray(block.content)) {
+              block.content.forEach((inline: any) => {
+                if (
+                  inline.type === "link" &&
+                  inline.attrs &&
+                  inline.attrs.href
+                ) {
+                  const match = inline.attrs.href.match(/\/page\/([a-f0-9-]+)/);
+                  if (match) {
+                    links.push(match[1]);
+                  }
+                }
+              });
+            }
+          }
+
+          // Handle nested structures
+          if (block.content && Array.isArray(block.content)) {
+            traverseContent(block.content);
+          }
+          if (block.children && Array.isArray(block.children)) {
+            traverseContent(block.children);
+          }
+        });
+      };
+
+      traverseContent(content);
+      return [...new Set(links)]; // Remove duplicates
+    };
+
+    // Create a map of all pages for easy lookup
+    const pageMap = new Map();
+    allPages.forEach((p) => pageMap.set(p.id, p));
+
+    // Build a comprehensive link map
+    const linkMap = new Map<string, string[]>();
+    allPages.forEach((page) => {
+      const links = extractLinksFromContent(page.content || []);
+      linkMap.set(page.id, links);
+      if (links.length > 0) {
+        console.log(
+          `🔗 Page "${page.title}" links to:`,
+          links.map((id) => {
+            const targetPage = pageMap.get(id);
+            return targetPage
+              ? `"${targetPage.title}" (${id})`
+              : `Unknown (${id})`;
+          })
+        );
+      }
+    });
+
+    console.log(`🔗 Building workspace graph for ${allPages.length} pages`);
+    console.log(
+      `📋 Total link relationships found: ${
+        Array.from(linkMap.values()).flat().length
+      }`
+    );
+
+    // Create nodes for all pages
+    const nodes: any[] = [];
+    const edges: any[] = [];
+
+    // Calculate layout positions using a force-directed approach
+    const centerX = 0;
+    const centerY = 0;
+    const radius = 300;
+
+    // Identify pages with the most connections (hubs)
+    const connectionCounts = new Map<string, number>();
+    allPages.forEach((page) => {
+      const outgoingLinks = linkMap.get(page.id) || [];
+      const incomingLinks = Array.from(linkMap.entries()).filter(([_, links]) =>
+        links.includes(page.id)
+      ).length;
+      connectionCounts.set(page.id, outgoingLinks.length + incomingLinks);
+    });
+
+    // Sort pages by connection count (most connected first)
+    const sortedPages = [...allPages].sort(
+      (a, b) =>
+        (connectionCounts.get(b.id) || 0) - (connectionCounts.get(a.id) || 0)
+    );
+
+    // Position nodes in concentric circles based on connectivity
+    sortedPages.forEach((page, index) => {
+      const connectionCount = connectionCounts.get(page.id) || 0;
+      let x, y;
+
+      if (connectionCount === 0) {
+        // Isolated pages go to the outer ring
+        const angle = (index * 2 * Math.PI) / sortedPages.length;
+        x = Math.cos(angle) * (radius + 100);
+        y = Math.sin(angle) * (radius + 100);
+      } else if (connectionCount >= 3) {
+        // Highly connected pages go to the center
+        const angle = (index * 2 * Math.PI) / Math.min(sortedPages.length, 6);
+        x = Math.cos(angle) * 100;
+        y = Math.sin(angle) * 100;
+      } else {
+        // Moderately connected pages go to the middle ring
+        const angle = (index * 2 * Math.PI) / sortedPages.length;
+        x = Math.cos(angle) * radius;
+        y = Math.sin(angle) * radius;
+      }
+
+      const hasOutgoingLinks = (linkMap.get(page.id) || []).length > 0;
+      const hasIncomingLinks = Array.from(linkMap.entries()).some(
+        ([_, links]) => links.includes(page.id)
+      );
+
+      let nodeType = "isolated";
+      if (hasOutgoingLinks && hasIncomingLinks) {
+        nodeType = "hub";
+      } else if (hasOutgoingLinks) {
+        nodeType = "source";
+      } else if (hasIncomingLinks) {
+        nodeType = "target";
+      }
+
+      nodes.push({
+        id: page.id,
+        label: page.title || "Untitled",
+        type: nodeType,
+        connectionCount,
+        x,
+        y,
+      });
+    });
+
+    // Create edges for all links
+    allPages.forEach((sourcePage) => {
+      const links = linkMap.get(sourcePage.id) || [];
+      links.forEach((targetPageId) => {
+        if (pageMap.has(targetPageId)) {
+          const targetPage = pageMap.get(targetPageId);
+          console.log(
+            `➡️ Creating edge: "${sourcePage.title}" -> "${targetPage.title}"`
+          );
+          edges.push({
+            id: `${sourcePage.id}-${targetPageId}`,
+            source: sourcePage.id,
+            target: targetPageId,
+            type: "page_link",
+            weight: 1.0,
+          });
+        } else {
+          console.log(`❌ Target page not found for link: ${targetPageId}`);
+        }
+      });
+    });
+
+    console.log(
+      `📊 Generated workspace graph with ${nodes.length} nodes and ${edges.length} edges`
+    );
+    console.log(`🔗 Page links: ${edges.length}`);
+    console.log(
+      `🏢 Hub pages: ${nodes.filter((n) => n.type === "hub").length}`
+    );
+    console.log(
+      `📤 Source pages: ${nodes.filter((n) => n.type === "source").length}`
+    );
+    console.log(
+      `📥 Target pages: ${nodes.filter((n) => n.type === "target").length}`
+    );
+    console.log(
+      `🏝️ Isolated pages: ${nodes.filter((n) => n.type === "isolated").length}`
+    );
+
+    res.json({
+      success: true,
+      graph: {
+        nodes,
+        edges,
+        centerNode: null, // No single center node in workspace view
+        workspaceId,
+        workspaceName: workspace.name,
+      },
+      timestamp: new Date().toISOString(),
+    });
+  }
+
   // Generate workspace summaries (batch operation)
   static async generateWorkspaceSummaries(req: Request, res: Response) {
     const { workspaceId } = req.params;
