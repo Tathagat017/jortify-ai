@@ -1,6 +1,11 @@
-import { useEffect, useCallback, useRef } from "react";
+import { useEffect, useCallback, useRef, useState } from "react";
 import { useCreateBlockNote } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/mantine";
+import {
+  SuggestionMenuController,
+  getDefaultReactSlashMenuItems,
+} from "@blocknote/react";
+import { filterSuggestionItems } from "@blocknote/core";
 import "@blocknote/core/style.css";
 import "@blocknote/mantine/style.css";
 import editorStore from "../../stores/editor-store";
@@ -8,6 +13,8 @@ import { useStore } from "../../hooks/use-store";
 import { UploadService } from "../../services/upload.service";
 import { LinkSuggestion } from "../../services/ai.service";
 import LinkSuggestionPopup from "../ai/auto-linking/LinkSuggestionPopup";
+import AIMenuPopup from "../ai/editor-ai/AIMenuPopup";
+import { createAISlashCommand } from "../ai/editor-ai/AISlashCommand";
 import type { PartialBlock } from "@blocknote/core";
 // import { customSchema } from "./blocks/custom-schema";
 
@@ -15,6 +22,7 @@ const SAVE_DEBOUNCE_MS = 1000; // 1 second debounce
 
 const BlockNoteEditorComponent = () => {
   const { pageStore, aiLinkStore, workspaceStore } = useStore();
+  const [isAIMenuOpen, setIsAIMenuOpen] = useState(false);
 
   // Create editor with custom upload function
   const editor = useCreateBlockNote({
@@ -45,6 +53,30 @@ const BlockNoteEditorComponent = () => {
       editorStore.setEditor(editor);
     }
   }, [editor]);
+
+  // Handle AI suggestion acceptance
+  const handleAISuggestionAccept = useCallback(
+    (suggestion: string) => {
+      if (!editor) return;
+
+      try {
+        // Insert the AI suggestion as a new paragraph block
+        editor.insertBlocks(
+          [
+            {
+              type: "paragraph",
+              content: suggestion,
+            },
+          ],
+          editor.getTextCursorPosition().block,
+          "after"
+        );
+      } catch (error) {
+        console.error("Error inserting AI suggestion:", error);
+      }
+    },
+    [editor]
+  );
 
   // Get cursor position for popup placement
   const getCursorPosition = useCallback((): { x: number; y: number } => {
@@ -191,21 +223,11 @@ const BlockNoteEditorComponent = () => {
   const handleContentChange = useCallback(async () => {
     if (!pageStore.selectedPage || !workspaceStore.selectedWorkspace) return;
 
-    // Clear any existing timeout
-    if (saveTimeoutRef.current) {
-      clearTimeout(saveTimeoutRef.current);
-    }
-
-    // Set new timeout for saving
-    saveTimeoutRef.current = setTimeout(async () => {
-      await editorStore.save();
-    }, SAVE_DEBOUNCE_MS);
-
-    // Only check for @link triggers, no auto-suggestions
+    // Get current text content from all blocks to check for "/ai"
+    let textContent = "";
     try {
-      // Get current text content from all blocks
       const blocks = editor.topLevelBlocks;
-      const textContent = blocks
+      textContent = blocks
         .map((block) => {
           // Simple text extraction - just get the basic text content
           if (block.type === "paragraph" && block.content) {
@@ -218,7 +240,27 @@ const BlockNoteEditorComponent = () => {
         .join(" ")
         .replace(/\s+/g, " ")
         .trim();
+    } catch (error) {
+      console.error("Error extracting text content:", error);
+    }
 
+    // Skip auto-save if "/ai" is present in the content
+    const hasAICommand = textContent.toLowerCase().includes("/ai");
+
+    if (!hasAICommand) {
+      // Clear any existing timeout
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+
+      // Set new timeout for saving
+      saveTimeoutRef.current = setTimeout(async () => {
+        await editorStore.save();
+      }, SAVE_DEBOUNCE_MS);
+    }
+
+    // Only check for @link triggers, no auto-suggestions
+    try {
       // Only check for @link trigger
       handleLinkTrigger(textContent);
     } catch (error) {
@@ -510,12 +552,33 @@ const BlockNoteEditorComponent = () => {
         theme={"light"}
         onChange={handleContentChange}
         editable={true}
-      />
+        slashMenu={false}
+      >
+        {/* Custom Slash Menu with AI command */}
+        <SuggestionMenuController
+          triggerCharacter="/"
+          getItems={async (query) => {
+            const defaultItems = getDefaultReactSlashMenuItems(editor);
+            const aiCommand = createAISlashCommand(editor, () =>
+              setIsAIMenuOpen(true)
+            );
+
+            return filterSuggestionItems([...defaultItems, aiCommand], query);
+          }}
+        />
+      </BlockNoteView>
 
       {/* Link Suggestion Popup */}
       <LinkSuggestionPopup
         onAccept={handleLinkAccept}
         onReject={handleLinkReject}
+      />
+
+      {/* AI Menu Popup */}
+      <AIMenuPopup
+        isOpen={isAIMenuOpen}
+        onClose={() => setIsAIMenuOpen(false)}
+        onSuggestionAccept={handleAISuggestionAccept}
       />
     </div>
   );

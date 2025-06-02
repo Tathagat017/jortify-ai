@@ -24,19 +24,19 @@ const linkSuggestionSchema = Joi.object({
 
 const tagGenerationSchema = Joi.object({
   title: Joi.string().required(),
-  content: Joi.object().required(),
+  content: Joi.array().default([]),
   workspaceId: Joi.string().uuid().required(),
 });
 
 const summarizeSchema = Joi.object({
   title: Joi.string().required(),
-  content: Joi.object().required(),
+  content: Joi.array().default([]),
   length: Joi.string().valid("short", "medium", "long").default("medium"),
 });
 
 const completeTextSchema = Joi.object({
   text: Joi.string().required(),
-  context: Joi.string().default(""),
+  context: Joi.string().allow("").default(""),
   maxTokens: Joi.number().integer().min(50).max(500).default(150),
 });
 

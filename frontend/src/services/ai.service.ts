@@ -48,14 +48,14 @@ export interface AISuggestion {
 }
 
 export interface WritingAnalysis {
-  readabilityScore: number;
-  sentimentScore: number;
-  suggestions: string[];
-  statistics: {
-    wordCount: number;
-    sentenceCount: number;
-    avgWordsPerSentence: number;
-  };
+  suggestions: Array<{
+    type: "grammar" | "style" | "clarity" | "tone";
+    message: string;
+    severity: "low" | "medium" | "high";
+    startIndex?: number;
+    endIndex?: number;
+  }>;
+  score: number; // 0-100
 }
 
 class AIService {
