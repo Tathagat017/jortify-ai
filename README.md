@@ -1,4 +1,4 @@
-# 🧠 Notion AI Clone - Intelligent Workspace Builder
+# 🧠 Jortify - Intelligent Workspace Builder
 ![image](https://github.com/user-attachments/assets/f9913097-e679-4ade-9738-fb9308a98d7a)
 
 ![image](https://github.com/user-attachments/assets/092ad574-dcc8-4126-ac66-3469454671ab)
