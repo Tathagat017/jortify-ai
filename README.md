@@ -623,7 +623,7 @@ For support, email [your-email@example.com] or join our [Discord community].
 
 <div align="center">
 
-**Built with ❤️ for the future of intelligent workspaces**
+**Built with ❤️ by Tathagat for the future of intelligent workspaces**
 
 [⬆ Back to Top](#-notion-ai-clone---intelligent-workspace-builder)
 
