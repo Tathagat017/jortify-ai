@@ -615,10 +615,6 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-## 📞 Support
-
-For support, email [your-email@example.com] or join our [Discord community].
-
 ---
 
 <div align="center">
