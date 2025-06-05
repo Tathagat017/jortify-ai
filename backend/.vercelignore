@@ -1,0 +1,12 @@
+node_modules
+.git
+.env.local
+.env.example
+dist
+backend_tests
+*.test.ts
+*.test.js
+.eslintrc.js
+jest.config.js
+README.md
+.gitignore 

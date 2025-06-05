@@ -1,0 +1,323 @@
+/* Custom BlockNote styling to match Notion design */
+
+/* Main editor container */
+.bn-editor {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol";
+  font-size: 16px;
+  line-height: 1.5;
+  color: #37352f;
+  position: relative;
+}
+
+/* Block content styling */
+.bn-block-content {
+  margin: 2px 0;
+  min-height: 1.5em;
+  position: relative;
+}
+
+/* Block container */
+.bn-block {
+  position: relative;
+  margin: 0;
+  padding: 0;
+}
+
+/* Block group for proper spacing */
+.bn-block-group {
+  margin: 1px 0;
+}
+
+/* Paragraph blocks */
+.bn-block[data-content-type="paragraph"] {
+  margin: 0;
+  padding: 3px 0;
+}
+
+.bn-block[data-content-type="paragraph"] .bn-block-content {
+  min-height: 1.5em;
+}
+
+/* Heading styles to match Notion */
+.bn-block[data-content-type="heading"] h1 {
+  font-size: 2.5em;
+  font-weight: 700;
+  line-height: 1.2;
+  margin: 0.5em 0 0.2em 0;
+  color: #37352f;
+}
+
+.bn-block[data-content-type="heading"] h2 {
+  font-size: 1.875em;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.4em 0 0.1em 0;
+  color: #37352f;
+}
+
+.bn-block[data-content-type="heading"] h3 {
+  font-size: 1.5em;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0.3em 0 0.1em 0;
+  color: #37352f;
+}
+
+/* List styles */
+.bn-block[data-content-type="bulletListItem"],
+.bn-block[data-content-type="numberedListItem"] {
+  margin: 0;
+  padding: 1px 0;
+}
+
+/* Block selection */
+.bn-block.bn-block-selected {
+  background-color: rgba(35, 131, 226, 0.07);
+  border-radius: 3px;
+}
+
+/* Side menu (+ button) - Enhanced visibility */
+.bn-side-menu {
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  position: absolute;
+  left: -44px;
+  top: 0;
+  z-index: 10;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.bn-block:hover .bn-side-menu,
+.bn-side-menu:hover {
+  opacity: 1;
+}
+
+.bn-side-menu button {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  border: none;
+  background: #f1f1ef;
+  color: #37352f;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+}
+
+.bn-side-menu button:hover {
+  background: #e9e9e7;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Drag handle - Enhanced visibility */
+.bn-drag-handle {
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  position: absolute;
+  left: -20px;
+  top: 2px;
+  width: 16px;
+  height: 16px;
+  background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10" fill="%23999"><circle cx="2" cy="2" r="1"/><circle cx="2" cy="5" r="1"/><circle cx="2" cy="8" r="1"/><circle cx="5" cy="2" r="1"/><circle cx="5" cy="5" r="1"/><circle cx="5" cy="8" r="1"/><circle cx="8" cy="2" r="1"/><circle cx="8" cy="5" r="1"/><circle cx="8" cy="8" r="1"/></svg>')
+    center/contain no-repeat;
+}
+
+.bn-block:hover .bn-drag-handle {
+  opacity: 0.4;
+}
+
+.bn-drag-handle:hover {
+  opacity: 1 !important;
+}
+
+.bn-drag-handle:active {
+  cursor: grabbing;
+}
+
+/* Slash menu styling */
+.bn-suggestion-menu {
+  background: white;
+  border: 1px solid #e9e9e7;
+  border-radius: 6px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 8px 0;
+  max-height: 300px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.bn-suggestion-menu-item {
+  padding: 8px 16px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  color: #37352f;
+  transition: background-color 0.15s ease;
+}
+
+.bn-suggestion-menu-item:hover,
+.bn-suggestion-menu-item.bn-suggestion-menu-item-selected {
+  background-color: #f1f1ef;
+}
+
+.bn-suggestion-menu-item-icon {
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+.bn-suggestion-menu-item-title {
+  font-weight: 500;
+}
+
+.bn-suggestion-menu-item-badge {
+  margin-left: auto;
+  font-size: 11px;
+  color: #9b9a97;
+  background: #f1f1ef;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+/* Code block styling */
+.bn-block[data-content-type="codeBlock"] {
+  background-color: #f7f6f3;
+  border: 1px solid #e9e9e7;
+  border-radius: 3px;
+  padding: 16px;
+  margin: 4px 0;
+}
+
+.bn-block[data-content-type="codeBlock"] code {
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
+    monospace;
+  font-size: 14px;
+  color: #eb5757;
+  background: none;
+}
+
+/* Table styling */
+.bn-block[data-content-type="table"] {
+  margin: 8px 0;
+}
+
+.bn-block[data-content-type="table"] table {
+  border-collapse: collapse;
+  width: 100%;
+  border: 1px solid #e9e9e7;
+}
+
+.bn-block[data-content-type="table"] th,
+.bn-block[data-content-type="table"] td {
+  border: 1px solid #e9e9e7;
+  padding: 8px 12px;
+  text-align: left;
+}
+
+.bn-block[data-content-type="table"] th {
+  background-color: #f7f6f3;
+  font-weight: 600;
+}
+
+/* Placeholder text */
+.bn-block-content[data-placeholder]::before {
+  content: attr(data-placeholder);
+  color: #9b9a97;
+  font-style: normal;
+  position: absolute;
+  pointer-events: none;
+}
+
+.bn-block-content:empty::before {
+  content: "Type '/' for commands";
+  color: #9b9a97;
+  font-style: normal;
+  position: absolute;
+  pointer-events: none;
+}
+
+.bn-block-content:focus:empty::before {
+  content: "Type '/' for commands";
+}
+
+/* Focus states */
+.bn-editor:focus-within {
+  outline: none;
+}
+
+.bn-block-content:focus {
+  outline: none;
+}
+
+/* Link styling */
+.bn-inline-content a {
+  color: #2383e2;
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: border-bottom-color 0.2s ease;
+}
+
+.bn-inline-content a:hover {
+  border-bottom-color: #2383e2;
+}
+
+/* Bold and italic */
+.bn-inline-content strong {
+  font-weight: 600;
+}
+
+.bn-inline-content em {
+  font-style: italic;
+}
+
+/* Inline code */
+.bn-inline-content code {
+  background-color: #f7f6f3;
+  color: #eb5757;
+  padding: 2px 4px;
+  border-radius: 3px;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Courier,
+    monospace;
+  font-size: 0.85em;
+}
+
+/* Block content spacing */
+.bn-block-content > * {
+  margin: 0;
+}
+
+.bn-block + .bn-block {
+  margin-top: 1px;
+}
+
+/* Improved hover states for better UX */
+.bn-block:hover {
+  background-color: rgba(0, 0, 0, 0.01);
+  border-radius: 3px;
+}
+
+/* Better spacing for nested blocks */
+.bn-block-content {
+  position: relative;
+  padding-left: 2px;
+}
+
+/* Ensure blocks have proper minimum height for interaction */
+.bn-block {
+  min-height: 1.5em;
+}
