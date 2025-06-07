@@ -55,6 +55,16 @@ export const Signup = observer(() => {
         autoClose: false,
         withCloseButton: true,
       });
+    } else if (authStore.error) {
+      // Show error notification
+      notifications.show({
+        id: "signup-error",
+        title: "Signup Failed",
+        message: authStore.error,
+        color: "red",
+        autoClose: 5000,
+        withCloseButton: true,
+      });
     }
   };
 

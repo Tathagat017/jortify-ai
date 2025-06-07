@@ -45,7 +45,7 @@ export const DeleteConfirmation = ({
     setIsDeleting(true);
     try {
       await onConfirm();
-      console.log(`✅ STEP: Delete successful - ${itemName} deleted`);
+      
       setOpened(false);
     } catch (error) {
       console.error(

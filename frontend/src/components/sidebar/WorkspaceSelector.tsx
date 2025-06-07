@@ -90,6 +90,7 @@ const WorkspaceSelector: React.FC<WorkspaceSelectorProps> = observer(
       if (newWorkspaceName.trim()) {
         createWorkspaceMutation.mutate(newWorkspaceName.trim());
       }
+      pageStore.setSelectedPageAsNull();
     };
 
     const handleUpdateWorkspace = (id: string) => {

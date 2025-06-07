@@ -99,7 +99,7 @@ const TitleBar: React.FC = observer(() => {
                 color="red"
                 onClick={() => {
                   // TODO: Implement page deletion
-                  console.log("Delete page");
+                  
                 }}
               >
                 Delete page

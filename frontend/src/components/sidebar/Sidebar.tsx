@@ -393,7 +393,7 @@ const Sidebar: React.FC<SidebarProps> = observer(({ isOpen }) => {
 
   const handleMovePage = (pageId: string) => {
     // TODO: Implement move page modal/selector
-    console.log("Move page:", pageId);
+    console.log("move page", pageId);
   };
 
   const handleDeletePage = (pageId: string) => {

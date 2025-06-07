@@ -222,7 +222,7 @@ const AIMenuPopup: React.FC<AIMenuPopupProps> = ({
         } else {
           // For other operations, check if we have a page summary to use as content
           if (pageStore.selectedPage.summary) {
-            console.log("Using page summary as content for AI operation");
+            
             const summaryContent = `Page Summary: ${pageStore.selectedPage.summary}`;
 
             let response: string;

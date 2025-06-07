@@ -26,8 +26,16 @@ export class FileEmbeddingService {
         fileType
       );
 
-      // Chunk the document
-      const chunks = DocumentParserService.chunkDocument(parsedDoc.text);
+      // Chunk the document using advanced chunking with fallback
+      const chunks = await DocumentParserService.chunkDocument(parsedDoc.text, {
+        maxTokens: 1000,
+        overlapTokens: 200,
+        useAdvancedChunking: true,
+        preserveCodeBlocks: true,
+        preserveMarkdown: true,
+      });
+
+      console.log(`📋 Generated ${chunks.length} chunks for file ${fileId}`);
 
       // Generate embeddings for each chunk
       const embeddingPromises = chunks.map(async (chunk, index) => {
@@ -44,6 +52,8 @@ export class FileEmbeddingService {
             metadata: {
               chunk_length: chunk.length,
               chunk_words: chunk.split(/\s+/).length,
+              token_count: DocumentParserService.getTokenCount(chunk),
+              chunking_method: "langchain_tiktoken",
             },
           });
 

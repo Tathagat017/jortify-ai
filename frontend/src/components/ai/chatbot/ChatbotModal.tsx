@@ -208,7 +208,6 @@ const ChatbotModal = observer(() => {
                       size="xs"
                       checked={chatStore.webSearchEnabled}
                       onChange={() => chatStore.toggleWebSearch()}
-                      disabled
                       styles={{
                         track: {
                           backgroundColor: chatStore.webSearchEnabled

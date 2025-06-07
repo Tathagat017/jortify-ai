@@ -725,10 +725,16 @@ export class PageStore {
       const page = this.pages.find((p) => p.id === pageId);
       if (!page) return;
 
-      // Check if page has meaningful content
+      // Check if page has meaningful content or title
       const contentText = this.extractTextFromContent(page.content);
-      if (!contentText || contentText.trim().length < 50) {
-        return; // Don't generate tags for pages with minimal content
+      const hasContent = contentText && contentText.trim().length >= 10;
+      const hasTitle =
+        page.title &&
+        page.title.trim().length >= 3 &&
+        !page.title.toLowerCase().includes("untitled");
+
+      if (!hasContent && !hasTitle) {
+        return; // Don't generate tags for completely empty pages
       }
 
       // Import tagStore dynamically to avoid circular dependency

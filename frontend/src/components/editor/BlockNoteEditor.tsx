@@ -124,7 +124,7 @@ const BlockNoteEditorComponent = () => {
               editor.setTextCursorPosition(blocks[insertedBlockIndex], "end");
             }
           } catch (error) {
-            console.log("Could not set cursor after AI suggestion:", error);
+            
           }
         }, 10);
       } catch (error) {
@@ -632,7 +632,7 @@ const BlockNoteEditorComponent = () => {
         try {
           cursorPosition = editor.getTextCursorPosition();
         } catch (error) {
-          console.log("Could not get cursor position:", error);
+          
         }
 
         editor.replaceBlocks(editor.topLevelBlocks, newContent);
@@ -648,7 +648,7 @@ const BlockNoteEditorComponent = () => {
                 editor.setTextCursorPosition(blocks[blocks.length - 1], "end");
               }
             } catch (error) {
-              console.log("Could not restore cursor position:", error);
+              
             }
           }, 10);
         }

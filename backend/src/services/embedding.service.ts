@@ -75,10 +75,20 @@ export class EmbeddingService {
    */
   static async generatePageEmbedding(pageId: string): Promise<void> {
     try {
-      // Fetch page data
+      // Fetch page data with tags
       const { data: page, error: pageError } = await supabase
         .from("pages")
-        .select("title, content")
+        .select(
+          `
+          title, 
+          content,
+          page_tags (
+            tags (
+              name
+            )
+          )
+        `
+        )
         .eq("id", pageId)
         .single();
 
@@ -86,9 +96,22 @@ export class EmbeddingService {
         throw new Error(`Page not found: ${pageId}`);
       }
 
-      // Extract text and calculate hash
-      const text = this.extractTextFromPage(page.title, page.content);
-      const contentHash = this.calculateContentHash(page.title, page.content);
+      // Extract tags
+      const tags =
+        page.page_tags?.map((pt: any) => pt.tags?.name).filter(Boolean) || [];
+
+      // Extract text and include tags
+      let text = this.extractTextFromPage(page.title, page.content);
+
+      // Add tags to the text for embedding
+      if (tags.length > 0) {
+        text += "\n\nTags: " + tags.join(", ");
+      }
+
+      const contentHash = this.calculateContentHash(
+        page.title,
+        page.content + tags.join(",")
+      );
 
       // Check if embedding already exists and is up to date
       const { data: existingEmbedding, error: selectError } = await supabase
@@ -149,6 +172,7 @@ export class EmbeddingService {
             metadata: {
               textLength: text.length,
               lastGenerated: new Date().toISOString(),
+              tags: tags,
             },
           },
           {
@@ -179,7 +203,9 @@ export class EmbeddingService {
         );
       }
 
-      console.log(`Generated embedding for page ${pageId}`);
+      console.log(
+        `Generated embedding for page ${pageId} with ${tags.length} tags`
+      );
     } catch (error) {
       console.error(`Error generating embedding for page ${pageId}:`, error);
       // Don't throw the error to prevent it from breaking page creation

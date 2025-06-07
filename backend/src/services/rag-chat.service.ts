@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import { tavily } from "@tavily/core";
 import { supabase } from "../lib/supabase";
 import { EmbeddingService } from "./embedding.service";
 
@@ -6,6 +7,11 @@ import { EmbeddingService } from "./embedding.service";
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
+
+// Initialize Tavily client
+const tavilyClient = process.env.TAVILY_API_KEY
+  ? tavily({ apiKey: process.env.TAVILY_API_KEY })
+  : null;
 
 export interface ChatMessage {
   role: "user" | "assistant";
@@ -489,13 +495,157 @@ export class RAGChatService {
    */
   private static async performWebSearch(query: string): Promise<any> {
     try {
-      // TODO: Implement Tavily web search integration
-      console.log(`🌐 Web search for: "${query}" - NOT YET IMPLEMENTED`);
-      return null;
+      console.log(`🌐 STEP 2.4.1: Starting web search for: "${query}"`);
+
+      // Check if Tavily client is initialized
+      if (!tavilyClient) {
+        console.warn(
+          "⚠️ Tavily API key not configured, falling back to limited search"
+        );
+
+        // Fallback to DuckDuckGo for basic instant answers
+        const encodedQuery = encodeURIComponent(query);
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodedQuery}&format=json&no_html=1&skip_disambig=1`;
+
+        const ddgResponse = await fetch(ddgUrl, {
+          headers: {
+            "User-Agent": "Notion-AI-Clone/1.0",
+          },
+        });
+
+        let instantAnswerData: any = null;
+        if (ddgResponse.ok) {
+          const data: any = await ddgResponse.json();
+          instantAnswerData = {
+            instantAnswer: data.Abstract || null,
+            instantAnswerSource: data.AbstractSource || null,
+            definition: data.Definition || null,
+            answer: data.Answer || null,
+          };
+        }
+
+        return {
+          query: query,
+          instantAnswer: instantAnswerData?.instantAnswer || null,
+          instantAnswerSource: instantAnswerData?.instantAnswerSource || null,
+          definition: instantAnswerData?.definition || null,
+          answer: instantAnswerData?.answer || null,
+          searchNote:
+            "Note: Tavily API key not configured. Using limited fallback search.",
+          searchSuggestions: this.generateSearchSuggestions(query),
+        };
+      }
+
+      // Use Tavily for comprehensive web search
+      console.log(`🔍 STEP 2.4.2: Performing Tavily search for: "${query}"`);
+
+      const searchResponse = await tavilyClient.search(query, {
+        searchDepth: "advanced",
+        maxResults: 5,
+        includeAnswer: true,
+        includeRawContent: false,
+        includeDomains: [],
+        excludeDomains: [],
+      });
+
+      console.log(`✅ STEP 2.4.3: Tavily search completed`);
+
+      // Process Tavily results
+      const results = {
+        query: query,
+        answer: searchResponse.answer || null,
+        results: searchResponse.results.map((result: any) => ({
+          title: result.title,
+          url: result.url,
+          content: result.content,
+          score: result.score,
+        })),
+        images: searchResponse.images || [],
+        followUpQuestions: (searchResponse as any).followUpQuestions || [],
+      };
+
+      console.log(`📊 STEP 2.4.4: Tavily search results:`, {
+        hasAnswer: !!results.answer,
+        resultCount: results.results.length,
+        hasImages: results.images.length > 0,
+        hasFollowUpQuestions: results.followUpQuestions.length > 0,
+      });
+
+      return results;
     } catch (error) {
-      console.error("Error performing web search:", error);
-      return null;
+      console.error("❌ Error performing web search:", error);
+
+      // If Tavily fails, try fallback
+      console.log("🔄 Falling back to DuckDuckGo instant answers");
+
+      try {
+        const encodedQuery = encodeURIComponent(query);
+        const ddgUrl = `https://api.duckduckgo.com/?q=${encodedQuery}&format=json&no_html=1&skip_disambig=1`;
+
+        const ddgResponse = await fetch(ddgUrl, {
+          headers: {
+            "User-Agent": "Notion-AI-Clone/1.0",
+          },
+        });
+
+        let instantAnswerData: any = null;
+        if (ddgResponse.ok) {
+          const data: any = await ddgResponse.json();
+          instantAnswerData = {
+            instantAnswer: data.Abstract || null,
+            instantAnswerSource: data.AbstractSource || null,
+            definition: data.Definition || null,
+            answer: data.Answer || null,
+          };
+        }
+
+        return {
+          query: query,
+          instantAnswer: instantAnswerData?.instantAnswer || null,
+          instantAnswerSource: instantAnswerData?.instantAnswerSource || null,
+          definition: instantAnswerData?.definition || null,
+          answer: instantAnswerData?.answer || null,
+          searchNote: "Note: Tavily search failed. Using fallback search.",
+          searchSuggestions: this.generateSearchSuggestions(query),
+        };
+      } catch (fallbackError) {
+        console.error("❌ Fallback search also failed:", fallbackError);
+        return null;
+      }
     }
+  }
+
+  /**
+   * Generate search suggestions based on the query
+   */
+  private static generateSearchSuggestions(query: string): string[] {
+    const suggestions: string[] = [];
+
+    // Add contextual suggestions based on common query patterns
+    if (query.toLowerCase().includes("how to")) {
+      suggestions.push("Consider checking official documentation or tutorials");
+    }
+    if (
+      query.toLowerCase().includes("what is") ||
+      query.toLowerCase().includes("define")
+    ) {
+      suggestions.push("This query seeks a definition or explanation");
+    }
+    if (
+      query.toLowerCase().includes("latest") ||
+      query.toLowerCase().includes("2025") ||
+      query.toLowerCase().includes("current")
+    ) {
+      suggestions.push("This query requires up-to-date information");
+    }
+    if (
+      query.toLowerCase().includes("best") ||
+      query.toLowerCase().includes("top")
+    ) {
+      suggestions.push("This query seeks recommendations or comparisons");
+    }
+
+    return suggestions;
   }
 
   /**
@@ -558,16 +708,71 @@ ${summary}
         .join("\n");
 
       // Prepare web search context if available
-      const webContext = webSearchResults
-        ? `\nWEB SEARCH RESULTS:\n${JSON.stringify(
-            webSearchResults,
-            null,
-            2
-          )}\n`
-        : "";
+      let webContext = "";
+      if (webSearchResults) {
+        webContext = "\nWEB SEARCH RESULTS:\n";
+        webContext += `Search Query: "${webSearchResults.query}"\n\n`;
+
+        // Handle Tavily results
+        if (webSearchResults.results && webSearchResults.results.length > 0) {
+          if (webSearchResults.answer) {
+            webContext += `AI Answer: ${webSearchResults.answer}\n\n`;
+          }
+
+          webContext += "Top Search Results:\n";
+          webSearchResults.results.forEach((result: any, index: number) => {
+            webContext += `\n${index + 1}. ${result.title}\n`;
+            webContext += `   URL: ${result.url}\n`;
+            webContext += `   ${result.content}\n`;
+          });
+          webContext += "\n";
+
+          if (
+            webSearchResults.followUpQuestions &&
+            webSearchResults.followUpQuestions.length > 0
+          ) {
+            webContext += "Related Questions:\n";
+            webSearchResults.followUpQuestions.forEach((q: string) => {
+              webContext += `- ${q}\n`;
+            });
+            webContext += "\n";
+          }
+        }
+        // Handle fallback results (DuckDuckGo)
+        else {
+          if (webSearchResults.instantAnswer) {
+            webContext += `Summary: ${webSearchResults.instantAnswer}\n`;
+            if (webSearchResults.instantAnswerSource) {
+              webContext += `Source: ${webSearchResults.instantAnswerSource}\n`;
+            }
+            webContext += "\n";
+          }
+          if (webSearchResults.definition) {
+            webContext += `Definition: ${webSearchResults.definition}\n\n`;
+          }
+          if (webSearchResults.answer) {
+            webContext += `Direct Answer: ${webSearchResults.answer}\n\n`;
+          }
+          if (webSearchResults.searchNote) {
+            webContext += `${webSearchResults.searchNote}\n\n`;
+          }
+          if (
+            webSearchResults.searchSuggestions &&
+            webSearchResults.searchSuggestions.length > 0
+          ) {
+            webContext += "Search Context:\n";
+            webSearchResults.searchSuggestions.forEach((suggestion: string) => {
+              webContext += `- ${suggestion}\n`;
+            });
+          }
+        }
+        webContext += "\n";
+      }
 
       const systemPrompt = helpMode
         ? "You are a helpful AI assistant that answers questions about how to use this application based on the help documentation. Focus on providing clear, step-by-step instructions."
+        : webSearchResults
+        ? "You are a helpful AI assistant that answers questions using both workspace knowledge and web search results. Prioritize workspace content but supplement with web information when relevant."
         : "You are a helpful AI assistant that answers questions based on a workspace's knowledge base. Focus on the specific content and context of the workspace.";
 
       const prompt = `${systemPrompt}
@@ -585,7 +790,11 @@ INSTRUCTIONS:
 1. Answer the question using the provided ${
         helpMode ? "help documentation" : "workspace documents"
       } as your primary source
-2. If the documents don't contain enough information, acknowledge this limitation
+${
+  webSearchResults
+    ? "2. If web search results are provided, use them to supplement your answer with current information"
+    : "2. If the documents don't contain enough information, acknowledge this limitation"
+}
 3. Be concise but thorough
 4. Reference specific ${helpMode ? "help sections" : "documents"} when relevant
 5. If building on conversation history, acknowledge previous context
@@ -593,7 +802,14 @@ INSTRUCTIONS:
 ${
   helpMode
     ? "7. Focus on explaining HOW to use features, not WHAT content is in the workspace"
+    : webSearchResults
+    ? "7. Clearly indicate when information comes from web search vs workspace documents"
     : "7. Focus on the actual content and knowledge in the workspace"
+}
+${
+  webSearchResults && !relevantDocs.length
+    ? "8. Since no workspace documents are relevant, rely primarily on web search results"
+    : ""
 }
 
 Please provide a comprehensive answer:`;

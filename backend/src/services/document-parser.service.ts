@@ -1,6 +1,8 @@
 import pdfParse from "pdf-parse";
 import * as mammoth from "mammoth";
 import { AppError } from "../middleware/error-handler";
+import { RecursiveCharacterTextSplitter } from "@langchain/textsplitters";
+import { encoding_for_model } from "tiktoken";
 
 export interface ParsedDocument {
   text: string;
@@ -8,6 +10,26 @@ export interface ParsedDocument {
     pageCount?: number;
     wordCount: number;
     characterCount: number;
+  };
+}
+
+export interface ChunkingOptions {
+  maxTokens?: number;
+  overlapTokens?: number;
+  useAdvancedChunking?: boolean;
+  preserveCodeBlocks?: boolean;
+  preserveMarkdown?: boolean;
+}
+
+export interface ChunkingResult {
+  chunks: string[];
+  metadata: {
+    totalChunks: number;
+    method: "advanced" | "basic";
+    avgTokensPerChunk: number;
+    avgCharsPerChunk: number;
+    totalTokens: number;
+    processingTime: number;
   };
 }
 
@@ -91,13 +113,145 @@ export class DocumentParserService {
   }
 
   /**
-   * Chunk document text into smaller pieces for embedding
+   * Enhanced chunk document with detailed metadata
    */
-  static chunkDocument(
+  static async chunkDocumentWithMetadata(
     text: string,
-    maxTokens: number = 1000,
-    overlapTokens: number = 200
+    options: ChunkingOptions = {}
+  ): Promise<ChunkingResult> {
+    const startTime = Date.now();
+    const chunks = await this.chunkDocument(text, options);
+    const processingTime = Date.now() - startTime;
+
+    // Calculate metadata
+    const totalTokens = chunks.reduce(
+      (sum, chunk) => sum + this.getTokenCount(chunk),
+      0
+    );
+    const avgTokensPerChunk = Math.round(totalTokens / chunks.length);
+    const avgCharsPerChunk = Math.round(
+      chunks.reduce((sum, chunk) => sum + chunk.length, 0) / chunks.length
+    );
+
+    return {
+      chunks,
+      metadata: {
+        totalChunks: chunks.length,
+        method: options.useAdvancedChunking !== false ? "advanced" : "basic",
+        avgTokensPerChunk,
+        avgCharsPerChunk,
+        totalTokens,
+        processingTime,
+      },
+    };
+  }
+
+  /**
+   * Enhanced chunk document text using LangChain with tiktoken tokenization
+   * Falls back to basic chunking if advanced chunking fails
+   */
+  static async chunkDocument(
+    text: string,
+    options: ChunkingOptions = {}
+  ): Promise<string[]> {
+    const {
+      maxTokens = 1000,
+      overlapTokens = 200,
+      useAdvancedChunking = true,
+      preserveCodeBlocks = true,
+      preserveMarkdown = true,
+    } = options;
+
+    console.log("🔄 Starting chunking process...");
+    console.log(`📊 Text length: ${text.length} characters`);
+    console.log(`⚙️ Max tokens: ${maxTokens}, Overlap: ${overlapTokens}`);
+    console.log(`🚀 Advanced chunking: ${useAdvancedChunking}`);
+
+    if (useAdvancedChunking) {
+      try {
+        return await this.advancedChunkDocument(
+          text,
+          maxTokens,
+          overlapTokens,
+          {
+            preserveCodeBlocks,
+            preserveMarkdown,
+          }
+        );
+      } catch (error) {
+        console.warn(
+          "🚨 Advanced chunking failed, falling back to basic chunking:",
+          error
+        );
+        return this.basicChunkDocument(text, maxTokens, overlapTokens);
+      }
+    } else {
+      return this.basicChunkDocument(text, maxTokens, overlapTokens);
+    }
+  }
+
+  /**
+   * Advanced chunking using LangChain RecursiveCharacterTextSplitter with tiktoken
+   */
+  private static async advancedChunkDocument(
+    text: string,
+    maxTokens: number,
+    overlapTokens: number,
+    options: { preserveCodeBlocks: boolean; preserveMarkdown: boolean }
+  ): Promise<string[]> {
+    console.log("🚀 Using advanced LangChain + tiktoken chunking");
+
+    try {
+      // Initialize tiktoken encoder for accurate token counting
+      const encoder = encoding_for_model("gpt-3.5-turbo");
+
+      // Custom length function using tiktoken
+      const lengthFunction = (text: string): number => {
+        return encoder.encode(text).length;
+      };
+
+      // Configure separators based on content type
+      const separators = this.buildSeparators(options);
+
+      // Create RecursiveCharacterTextSplitter with tiktoken
+      const splitter = new RecursiveCharacterTextSplitter({
+        chunkSize: maxTokens,
+        chunkOverlap: overlapTokens,
+        lengthFunction,
+        separators,
+        keepSeparator: true,
+      });
+
+      // Split the text
+      const chunks = await splitter.splitText(text);
+
+      // Clean up encoder
+      encoder.free();
+
+      console.log(`✅ Advanced chunking completed: ${chunks.length} chunks`);
+      console.log(
+        `📊 Average chunk size: ${Math.round(
+          chunks.reduce((sum, chunk) => sum + chunk.length, 0) / chunks.length
+        )} characters`
+      );
+
+      return chunks.filter((chunk) => chunk.trim().length > 0);
+    } catch (error) {
+      console.error("❌ Advanced chunking error:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * Basic chunking method (fallback) - Original implementation
+   */
+  private static basicChunkDocument(
+    text: string,
+    maxTokens: number,
+    overlapTokens: number
   ): string[] {
+    console.log("🔄 Using basic word-based chunking (fallback)");
+
     // Simple word-based chunking (approximating 1 token ≈ 0.75 words)
     const wordsPerChunk = Math.floor(maxTokens * 0.75);
     const overlapWords = Math.floor(overlapTokens * 0.75);
@@ -117,7 +271,69 @@ export class DocumentParserService {
       if (i + wordsPerChunk >= words.length) break;
     }
 
+    console.log(`✅ Basic chunking completed: ${chunks.length} chunks`);
     return chunks;
+  }
+
+  /**
+   * Build separators for RecursiveCharacterTextSplitter based on content type
+   */
+  private static buildSeparators(options: {
+    preserveCodeBlocks: boolean;
+    preserveMarkdown: boolean;
+  }): string[] {
+    const separators: string[] = [];
+
+    if (options.preserveMarkdown) {
+      // Markdown-specific separators
+      separators.push(
+        "\n## ", // H2 headers
+        "\n### ", // H3 headers
+        "\n#### ", // H4 headers
+        "\n# ", // H1 headers
+        "\n---", // Horizontal rules
+        "\n```" // Code blocks
+      );
+    }
+
+    if (options.preserveCodeBlocks) {
+      // Code block separators
+      separators.push("\n```\n", "\n```", "```\n");
+    }
+
+    // Standard separators (in order of preference)
+    separators.push(
+      "\n\n", // Double newlines (paragraphs)
+      "\n", // Single newlines
+      ". ", // Sentence endings
+      "! ", // Exclamation endings
+      "? ", // Question endings
+      "; ", // Semicolons
+      ", ", // Commas
+      " ", // Spaces
+      "" // Characters (last resort)
+    );
+
+    return separators;
+  }
+
+  /**
+   * Get accurate token count using tiktoken
+   */
+  static getTokenCount(text: string, model: string = "gpt-3.5-turbo"): number {
+    try {
+      const encoder = encoding_for_model(model as any);
+      const tokenCount = encoder.encode(text).length;
+      encoder.free();
+      return tokenCount;
+    } catch (error) {
+      console.warn(
+        "Failed to get accurate token count, using approximation:",
+        error
+      );
+      // Fallback to approximation: 1 token ≈ 0.75 words
+      return Math.ceil(text.split(/\s+/).length / 0.75);
+    }
   }
 
   /**
@@ -137,6 +353,9 @@ export class DocumentParserService {
       hasHeaders: /^#{1,6}\s+/m.test(text) || /^[A-Z][A-Z\s]{2,}$/m.test(text),
       hasBulletPoints: /^[\-\*\•]/m.test(text),
       hasNumberedList: /^\d+\./m.test(text),
+      tokenCount: this.getTokenCount(text),
+      isMarkdown: /^#{1,6}\s+/m.test(text) || /```/.test(text),
+      hasCodeBlocks: /```/.test(text),
     };
   }
 }

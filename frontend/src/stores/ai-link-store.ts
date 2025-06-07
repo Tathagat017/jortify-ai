@@ -101,7 +101,7 @@ export class AILinkStore {
           ? this.currentText
           : "link to relevant page"; // Default context for AI suggestions
 
-      console.log("📝 Text for AI suggestions:", textForSuggestions);
+      
 
       await this.generateSuggestions(textForSuggestions, workspaceId, pageId);
 
@@ -194,7 +194,7 @@ export class AILinkStore {
         100 // context window
       );
 
-      console.log("🤖 AI service returned suggestions:", suggestions);
+      
 
       // DEBUG: Log summary information for each suggestion
       console.log("🔍 Debugging suggestion summaries:", {

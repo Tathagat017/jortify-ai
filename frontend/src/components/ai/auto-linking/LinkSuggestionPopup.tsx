@@ -157,13 +157,15 @@ const LinkSuggestionPopup: React.FC<LinkSuggestionPopupProps> = observer(
 
     const getConfidenceColor = (confidence: number): string => {
       if (confidence >= 0.8) return "green";
-      if (confidence >= 0.6) return "yellow";
+      if (confidence >= 0.6) return "blue";
+      if (confidence >= 0.4) return "yellow";
       return "orange";
     };
 
     const getConfidenceLabel = (confidence: number): string => {
       if (confidence >= 0.8) return "High";
-      if (confidence >= 0.6) return "Medium";
+      if (confidence >= 0.6) return "Good";
+      if (confidence >= 0.4) return "Medium";
       return "Low";
     };
 
@@ -181,16 +183,6 @@ const LinkSuggestionPopup: React.FC<LinkSuggestionPopupProps> = observer(
     ) => {
       const isSelected = index === aiLinkStore.selectedIndex;
       const isLinkSuggestion = "pageId" in item;
-
-      // DEBUG: Log summary information
-      console.log(`🎨 Rendering suggestion item:`, {
-        title: isLinkSuggestion ? item.pageTitle : item.title,
-        isAISuggestion,
-        isLinkSuggestion,
-        hasSummary: !!item.summary,
-        summary: item.summary,
-        summaryLength: item.summary?.length || 0,
-      });
 
       return (
         <Box
@@ -212,22 +204,8 @@ const LinkSuggestionPopup: React.FC<LinkSuggestionPopupProps> = observer(
                   {isLinkSuggestion ? item.pageTitle : item.title}
                 </Text>
 
-                {/* Show text for AI suggestions */}
-                {isLinkSuggestion && item.text && (
-                  <Text size="xs" className={classes.itemSnippet}>
-                    "{item.text}"
-                  </Text>
-                )}
-
-                {/* Show summary for both AI suggestions and pages */}
-                {isLinkSuggestion && item.summary && (
-                  <Text size="xs" className={classes.itemSummary}>
-                    {item.summary}
-                  </Text>
-                )}
-
-                {/* Show summary for regular pages */}
-                {!isLinkSuggestion && item.summary && (
+                {/* Show summary for all items */}
+                {item.summary && (
                   <Text size="xs" className={classes.itemSummary}>
                     {item.summary}
                   </Text>

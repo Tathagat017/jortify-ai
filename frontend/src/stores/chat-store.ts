@@ -69,7 +69,6 @@ export class ChatStore {
       // Clear current conversation when switching modes
       this.currentConversation = null;
       this.messages = [];
-      console.log(`🔄 Help mode toggled: ${this.helpMode ? "ON" : "OFF"}`);
     });
   };
 
@@ -332,9 +331,13 @@ export class ChatStore {
         // Add AI response
         this.messages.push(aiMessage);
 
-        // Update current conversation ID if this was a new conversation
-        if (!this.currentConversation && response.conversationId) {
-          this.currentConversation = {
+        // Update current conversation ID if this was a new conversation or auto-created
+        if (
+          response.conversationId &&
+          (!this.currentConversation ||
+            this.currentConversation.id !== response.conversationId)
+        ) {
+          const newConversation = {
             id: response.conversationId,
             title:
               messageToSend.slice(0, 50) +
@@ -348,7 +351,20 @@ export class ChatStore {
               webSearchEnabled: this.webSearchEnabled,
             },
           };
-          this.conversations.unshift(this.currentConversation);
+
+          // Update current conversation
+          this.currentConversation = newConversation;
+
+          // Add to conversations list if not already there
+          const existingIndex = this.conversations.findIndex(
+            (c) => c.id === response.conversationId
+          );
+          if (existingIndex === -1) {
+            this.conversations.unshift(newConversation);
+          } else {
+            // Update existing conversation
+            this.conversations[existingIndex] = newConversation;
+          }
         }
 
         this.isTyping = false;

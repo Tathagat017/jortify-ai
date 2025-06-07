@@ -14,7 +14,9 @@
   },
   "dependencies": {
     "@langchain/openai": "^0.5.11",
+    "@langchain/textsplitters": "^0.1.0",
     "@supabase/supabase-js": "^2.39.3",
+    "@tavily/core": "^0.5.6",
     "compression": "^1.8.0",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
@@ -34,6 +36,7 @@
     "pdf-parse": "^1.1.1",
     "sharp": "^0.34.2",
     "supabase": "^2.23.4",
+    "tiktoken": "^1.0.21",
     "typescript": "^5.3.3",
     "uuid": "^11.1.0",
     "winston": "^3.11.0"

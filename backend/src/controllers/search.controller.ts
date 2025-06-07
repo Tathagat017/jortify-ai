@@ -301,63 +301,66 @@ export class SearchController {
 
       // Process enhanced search results
       const processedResults = await Promise.all(
-        (searchResults || []).map(async (result: any) => {
-          if (result.source_type === "page") {
-            // For page results, get full page data with tags
-            const { data: pageData } = await supabase
-              .from("pages")
-              .select(
-                `
+        (searchResults || [])
+          // Filter out help content - it should only appear in RAG chatbot
+          .filter((result: any) => result.source_type !== "help")
+          .map(async (result: any) => {
+            if (result.source_type === "page") {
+              // For page results, get full page data with tags
+              const { data: pageData } = await supabase
+                .from("pages")
+                .select(
+                  `
                 id, title, content, created_at, updated_at, 
                 icon_url, cover_url, summary, parent_id
               `
-              )
-              .eq("id", result.page_id)
-              .single();
+                )
+                .eq("id", result.page_id)
+                .single();
 
-            const { data: pageTags } = await supabase
-              .from("page_tags")
-              .select(`tag:tags(id, name, color)`)
-              .eq("page_id", result.page_id);
+              const { data: pageTags } = await supabase
+                .from("page_tags")
+                .select(`tag:tags(id, name, color)`)
+                .eq("page_id", result.page_id);
 
-            return {
-              ...(pageData || {}),
-              id: result.page_id,
-              similarity: result.similarity,
-              source_type: result.source_type,
-              tags: pageTags?.map((pt: any) => pt.tag) || [],
-            };
-          } else {
-            // For file results, get page data and indicate it's from a file
-            const { data: pageData } = await supabase
-              .from("pages")
-              .select(
-                `
+              return {
+                ...(pageData || {}),
+                id: result.page_id,
+                similarity: result.similarity,
+                source_type: result.source_type,
+                tags: pageTags?.map((pt: any) => pt.tag) || [],
+              };
+            } else {
+              // For file results, get page data and indicate it's from a file
+              const { data: pageData } = await supabase
+                .from("pages")
+                .select(
+                  `
                 id, title, created_at, updated_at, 
                 icon_url, cover_url, summary, parent_id
               `
-              )
-              .eq("id", result.page_id)
-              .single();
+                )
+                .eq("id", result.page_id)
+                .single();
 
-            const { data: pageTags } = await supabase
-              .from("page_tags")
-              .select(`tag:tags(id, name, color)`)
-              .eq("page_id", result.page_id);
+              const { data: pageTags } = await supabase
+                .from("page_tags")
+                .select(`tag:tags(id, name, color)`)
+                .eq("page_id", result.page_id);
 
-            return {
-              ...(pageData || {}),
-              id: result.page_id,
-              title: `📄 ${result.title} (in ${
-                pageData?.title || "Unknown Page"
-              })`,
-              content: result.content, // File content
-              similarity: result.similarity,
-              source_type: result.source_type,
-              tags: pageTags?.map((pt: any) => pt.tag) || [],
-            };
-          }
-        })
+              return {
+                ...(pageData || {}),
+                id: result.page_id,
+                title: `📄 ${result.title} (in ${
+                  pageData?.title || "Unknown Page"
+                })`,
+                content: result.content, // File content
+                similarity: result.similarity,
+                source_type: result.source_type,
+                tags: pageTags?.map((pt: any) => pt.tag) || [],
+              };
+            }
+          })
       );
 
       // Apply tag filtering if specified

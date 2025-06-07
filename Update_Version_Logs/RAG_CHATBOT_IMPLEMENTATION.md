@@ -14,7 +14,7 @@ The RAG (Retrieval-Augmented Generation) chatbot is a sophisticated AI-powered a
 - **Vector Search**: PostgreSQL with pgvector extension
 - **Frontend**: React with MobX state management
 - **Real-time**: WebSocket (planned)
-- **Web Search**: Tavily API (planned)
+- **Web Search**: Tavily API (implemented)
 
 ### System Architecture
 
@@ -292,6 +292,24 @@ The core service handles all RAG operations:
 - Prevents mixing of help content with workspace queries
 - Dedicated UI indicator for active mode
 
+#### Web Search Integration
+
+- **Tavily API**: Advanced web search with AI-generated answers
+  - Requires `TAVILY_API_KEY` environment variable
+  - Returns top 5 search results with content snippets
+  - Includes AI-generated answer for the query
+  - Provides follow-up questions for deeper exploration
+- **Fallback Search**: DuckDuckGo instant answers
+
+  - Activates when Tavily API key not configured or on error
+  - Provides instant answers, definitions, and summaries
+  - Limited compared to full web search but requires no API key
+
+- **Search Result Processing**:
+  - Results are formatted and included in AI context
+  - AI clearly distinguishes between workspace and web sources
+  - URLs and relevance scores included for transparency
+
 #### Optimizations
 
 1. **Caching**: Embeddings are cached in database
@@ -372,17 +390,31 @@ class ChatStore {
 - Content manipulation
 - Workflow automation
 
-### 3. Tavily Web Search
+### 3. Tavily Web Search (Implemented)
 
-- External knowledge augmentation
-- Real-time information retrieval
-- Source attribution
+- External knowledge augmentation with real web search results
+- Real-time information retrieval from current web sources
+- Source attribution with URLs and relevance scores
+- Fallback to DuckDuckGo instant answers if Tavily unavailable
+- AI-generated answers from web search results
 
 ### 4. Performance Optimizations
 
 - Response streaming
 - Embedding cache improvements
 - Query optimization
+
+## Environment Variables
+
+### Required
+
+- `OPENAI_API_KEY`: OpenAI API key for embeddings and chat completion
+- `SUPABASE_URL`: Supabase project URL
+- `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key
+
+### Optional
+
+- `TAVILY_API_KEY`: Tavily API key for web search (falls back to DuckDuckGo if not provided)
 
 ## Security Considerations
 

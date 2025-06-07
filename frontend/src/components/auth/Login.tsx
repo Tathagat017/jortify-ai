@@ -49,6 +49,16 @@ export const Login = observer(() => {
         navigate(from, { replace: true });
         uiStore.closeAuthModal();
       }
+    } else if (authStore.error) {
+      // Show error notification
+      notifications.show({
+        id: "login-error",
+        title: "Login Failed",
+        message: authStore.error,
+        color: "red",
+        autoClose: 5000,
+        withCloseButton: true,
+      });
     }
   };
 

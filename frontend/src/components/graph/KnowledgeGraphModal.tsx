@@ -134,7 +134,7 @@ const KnowledgeGraphModal: React.FC = observer(() => {
 
     const flowEdges: Edge[] = graphViewStore.currentGraph.edges.map(
       (edge: GraphEdge) => {
-        console.log("🔗 Processing edge:", edge);
+        
         console.log(
           "🔍 Edge source exists in nodes:",
           flowNodes.some((n) => n.id === edge.source)

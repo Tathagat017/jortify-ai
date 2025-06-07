@@ -2,6 +2,7 @@ import { Request, Response } from "express";
 import { supabase } from "../lib/supabase";
 import { AppError } from "../middleware/error-handler";
 import { SummaryService } from "../services/summary.service";
+import { AIService } from "../services/ai.service";
 import Joi from "joi";
 
 // Validation schemas
@@ -226,8 +227,8 @@ export class PageController {
         }
       }
 
-      // Add tags if provided
-      if (tags?.length > 0) {
+      // Add tags to page if provided
+      if (tags && tags.length > 0) {
         const { error: tagError } = await supabase.from("page_tags").insert(
           tags.map((tagId: string) => ({
             page_id: page.id,
@@ -235,8 +236,13 @@ export class PageController {
           }))
         );
 
-        if (tagError) throw new AppError(500, "Failed to add tags to page");
+        if (tagError) {
+          console.warn("Failed to add some tags to page:", tagError);
+          // Don't throw error, continue without tags
+        }
       }
+
+      // Note: Tag generation is now handled by the frontend to avoid conflicts
 
       // Generate summary in background (don't wait for it)
       SummaryService.generatePageSummary(page.id).catch((error) => {
@@ -380,6 +386,34 @@ export class PageController {
     if (cover_image !== undefined) updateData.cover_image = cover_image;
 
     try {
+      // First, get the current page data to check existing tags
+      const { data: currentPage, error: fetchError } = await supabase
+        .from("pages")
+        .select(
+          `
+          id,
+          title,
+          content,
+          workspace_id,
+          page_tags (
+            tag_id,
+            tags (
+              id,
+              name
+            )
+          )
+        `
+        )
+        .eq("id", id)
+        .single();
+
+      if (fetchError || !currentPage) {
+        throw new AppError(404, "Page not found");
+      }
+
+      // Note: Auto-tag regeneration is now handled by the frontend to avoid conflicts
+
+      // Update the page
       const { data: page, error } = await supabase
         .from("pages")
         .update(updateData)
@@ -426,12 +460,11 @@ export class PageController {
       }
       if (!page) throw new AppError(404, "Page not found");
 
-      // Update tags if provided
+      // Handle tag updates
       if (tags !== undefined) {
-        // Remove existing tags
+        // Manual tag update - remove existing and add new
         await supabase.from("page_tags").delete().eq("page_id", id);
 
-        // Add new tags
         if (tags.length > 0) {
           const { error: tagError } = await supabase.from("page_tags").insert(
             tags.map((tagId: string) => ({
@@ -466,6 +499,33 @@ export class PageController {
       }
       throw error;
     }
+  }
+
+  /**
+   * Helper method to extract text from BlockNote content
+   */
+  private static extractTextFromContent(content: any): string {
+    if (!content || typeof content !== "object") return "";
+
+    let text = "";
+
+    // If content is an array of blocks
+    if (Array.isArray(content)) {
+      for (const block of content) {
+        if (block.content && Array.isArray(block.content)) {
+          for (const inline of block.content) {
+            if (inline.text) {
+              text += inline.text + " ";
+            }
+          }
+        }
+      }
+    } else if (content.blocks && Array.isArray(content.blocks)) {
+      // If content has a blocks property
+      return PageController.extractTextFromContent(content.blocks);
+    }
+
+    return text.trim();
   }
 
   // Delete a page (soft delete)

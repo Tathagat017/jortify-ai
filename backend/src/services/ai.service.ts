@@ -297,12 +297,47 @@ Respond with only the suggestions in JSON format:
         pageId,
       });
 
+      // Get already linked pages to exclude
+      let excludePageIds: string[] = [];
+      if (pageId) {
+        excludePageIds.push(pageId);
+
+        // Get pages linked FROM the current page
+        const { data: outgoingLinks, error: linkError } = await supabase
+          .from("page_links")
+          .select("target_page_id")
+          .eq("source_page_id", pageId);
+
+        if (!linkError && outgoingLinks) {
+          const linkedIds = outgoingLinks.map((link) => link.target_page_id);
+          excludePageIds = [...excludePageIds, ...linkedIds];
+        }
+
+        // Also get pages that are already linked within the current page's content
+        const { data: currentPage, error: pageError } = await supabase
+          .from("pages")
+          .select("content")
+          .eq("id", pageId)
+          .single();
+
+        if (!pageError && currentPage && currentPage.content) {
+          const linkedPageIds = this.extractLinkedPageIdsFromContent(
+            currentPage.content
+          );
+          excludePageIds = [...new Set([...excludePageIds, ...linkedPageIds])];
+        }
+
+        console.log(
+          `📋 Excluding ${excludePageIds.length} pages (current + already linked)`
+        );
+      }
+
       // FIXED: Include summary in the query so we can show summaries in fallback suggestions
       const { data: pages, error } = await supabase
         .from("pages")
         .select("id, title, content, summary")
         .eq("workspace_id", workspaceId)
-        .neq("id", pageId || "") // Exclude current page
+        .not("id", "in", `(${excludePageIds.filter(Boolean).join(",")})`)
         .limit(50);
 
       if (error || !pages) {
@@ -457,6 +492,43 @@ Respond with only the suggestions in JSON format:
   }
 
   /**
+   * Extract linked page IDs from BlockNote content (helper for basic suggestions)
+   */
+  private static extractLinkedPageIdsFromContent(content: any): string[] {
+    const linkedPageIds: string[] = [];
+
+    const traverseContent = (blocks: any[]) => {
+      if (!Array.isArray(blocks)) return;
+
+      for (const block of blocks) {
+        // Check inline content for links
+        if (block.content && Array.isArray(block.content)) {
+          for (const inline of block.content) {
+            if (inline.type === "link" && inline.href) {
+              // Extract page ID from internal links (format: /page/{pageId})
+              const match = inline.href.match(/\/page\/([a-f0-9-]+)/);
+              if (match && match[1]) {
+                linkedPageIds.push(match[1]);
+              }
+            }
+          }
+        }
+
+        // Recursively check children blocks
+        if (block.children && Array.isArray(block.children)) {
+          traverseContent(block.children);
+        }
+      }
+    };
+
+    if (Array.isArray(content)) {
+      traverseContent(content);
+    }
+
+    return [...new Set(linkedPageIds)]; // Remove duplicates
+  }
+
+  /**
    * Generate semantic tags for a page using AI
    */
   static async generateTags(
@@ -482,10 +554,171 @@ Respond with only the suggestions in JSON format:
 
       // Extract text content
       let textContent = title + "\n";
+      let hasContent = false;
+
       if (content && typeof content === "object") {
-        textContent += JSON.stringify(content);
+        const contentStr = JSON.stringify(content);
+        // Check if content has actual text (not just empty blocks)
+        if (contentStr.length > 50 && !contentStr.match(/^\[?\s*\]?$/)) {
+          textContent += contentStr;
+          hasContent = true;
+        }
       }
 
+      // If no content, use title-based and generic tags
+      if (!hasContent) {
+        console.log(`Generating tags for page with only title: "${title}"`);
+
+        // Generate tags based on title analysis
+        const titleWords = title
+          .toLowerCase()
+          .split(/\s+/)
+          .filter((word) => word.length > 2);
+        const suggestedTags: Array<{
+          name: string;
+          color: string;
+          confidence: number;
+        }> = [];
+
+        // Common stop words to filter out
+        const stopWords = new Set([
+          "the",
+          "and",
+          "for",
+          "with",
+          "from",
+          "about",
+          "into",
+          "through",
+          "during",
+          "before",
+          "after",
+        ]);
+
+        // Extract meaningful words from title (not in patterns and not stop words)
+        const meaningfulWords = titleWords.filter(
+          (word) =>
+            !stopWords.has(word) &&
+            word.length > 3 &&
+            !word.match(/^(new|untitled|page|document)$/)
+        );
+
+        // Check for common patterns in title
+        const patterns = [
+          {
+            keywords: ["meeting", "minutes", "notes"],
+            tag: { name: "meeting", color: "blue" },
+          },
+          {
+            keywords: ["todo", "task", "checklist"],
+            tag: { name: "tasks", color: "yellow" },
+          },
+          {
+            keywords: ["project", "plan", "roadmap"],
+            tag: { name: "project", color: "green" },
+          },
+          {
+            keywords: ["idea", "brainstorm", "thoughts"],
+            tag: { name: "ideas", color: "purple" },
+          },
+          {
+            keywords: ["doc", "documentation", "guide"],
+            tag: { name: "documentation", color: "gray" },
+          },
+          {
+            keywords: ["draft", "wip", "work in progress"],
+            tag: { name: "draft", color: "orange" },
+          },
+          {
+            keywords: ["api", "code", "programming", "development"],
+            tag: { name: "technical", color: "blue" },
+          },
+          {
+            keywords: ["design", "ui", "ux", "interface"],
+            tag: { name: "design", color: "purple" },
+          },
+          {
+            keywords: ["research", "study", "analysis"],
+            tag: { name: "research", color: "green" },
+          },
+          {
+            keywords: ["tutorial", "learning", "education"],
+            tag: { name: "education", color: "yellow" },
+          },
+        ];
+
+        // Check title against patterns
+        for (const pattern of patterns) {
+          if (
+            pattern.keywords.some((keyword) =>
+              titleWords.some((word) => word.includes(keyword))
+            )
+          ) {
+            suggestedTags.push({ ...pattern.tag, confidence: 0.7 });
+          }
+        }
+
+        // Add tags from meaningful words in title
+        for (const word of meaningfulWords.slice(0, 2)) {
+          // Take up to 2 meaningful words
+          // Skip if already added via patterns
+          if (!suggestedTags.some((tag) => tag.name === word)) {
+            suggestedTags.push({
+              name: word,
+              color: [
+                "blue",
+                "green",
+                "yellow",
+                "red",
+                "purple",
+                "gray",
+                "orange",
+                "pink",
+              ][Math.floor(Math.random() * 8)],
+              confidence: 0.6,
+            });
+          }
+        }
+
+        // Only add generic tags if we don't have enough specific ones
+        if (suggestedTags.length < 2) {
+          // Add generic "new" tag for empty pages
+          suggestedTags.push({ name: "new", color: "gray", confidence: 0.8 });
+
+          // Add "untitled" tag if title is generic
+          if (
+            title.toLowerCase().includes("untitled") ||
+            title.toLowerCase().includes("new page")
+          ) {
+            suggestedTags.push({
+              name: "untitled",
+              color: "red",
+              confidence: 0.9,
+            });
+          }
+        }
+
+        // Ensure we have at least 2 tags
+        if (suggestedTags.length < 2) {
+          suggestedTags.push({
+            name: "untagged",
+            color: "gray",
+            confidence: 0.7,
+          });
+        }
+
+        // Limit to 3 tags and ensure uniqueness
+        const uniqueTags = Array.from(
+          new Map(suggestedTags.map((tag) => [tag.name, tag])).values()
+        ).slice(0, 3);
+
+        return {
+          tags: uniqueTags,
+          reasoning: "Tags generated based on page title analysis",
+        };
+      }
+
+      // For pages with content, use AI
       const prompt = `
 Analyze the following page content and suggest 3-5 relevant tags.
 
@@ -502,7 +735,7 @@ Generate tags that are:
 Respond with JSON only:
 {
   "tags": [
-    {"name": "tag_name", "color": "blue|green|yellow|red|purple|gray", "confidence": 0.1-1.0}
+    {"name": "tag_name", "color": "blue|green|yellow|red|purple|gray|orange|pink", "confidence": 0.1-1.0}
   ],
   "reasoning": "Brief explanation of tag choices"
 }
@@ -527,10 +760,67 @@ Respond with JSON only:
         throw new Error("No response from AI");
       }
 
-      return JSON.parse(result);
+      const aiResult = JSON.parse(result);
+
+      // Validate and fix colors to match backend schema
+      const validColors = [
+        "blue",
+        "green",
+        "yellow",
+        "red",
+        "purple",
+        "gray",
+        "orange",
+        "pink",
+      ];
+      aiResult.tags = aiResult.tags.map((tag: any) => ({
+        ...tag,
+        color: validColors.includes(tag.color) ? tag.color : "blue", // Default to blue if invalid
+      }));
+
+      // Ensure at least 2 tags
+      if (aiResult.tags.length < 2) {
+        // Add a generic tag if needed
+        aiResult.tags.push({ name: "general", color: "gray", confidence: 0.5 });
+      }
+
+      return aiResult;
     } catch (error) {
       console.error("Error generating tags:", error);
-      throw new Error("Failed to generate AI tags");
+
+      // Fallback tags when AI fails
+      const validColors = [
+        "blue",
+        "green",
+        "yellow",
+        "red",
+        "purple",
+        "gray",
+        "orange",
+        "pink",
+      ];
+      const fallbackTags = [
+        { name: "unprocessed", color: "red", confidence: 0.5 },
+        { name: "general", color: "gray", confidence: 0.5 },
+      ];
+
+      // Try to generate at least one tag from title
+      const titleWords = title
+        .toLowerCase()
+        .split(/\s+/)
+        .filter((word) => word.length > 3);
+      if (titleWords.length > 0) {
+        fallbackTags[0] = {
+          name: titleWords[0],
+          color: validColors[Math.floor(Math.random() * validColors.length)],
+          confidence: 0.6,
+        };
+      }
+
+      return {
+        tags: fallbackTags,
+        reasoning: "Fallback tags generated due to AI error",
+      };
     }
   }
 
